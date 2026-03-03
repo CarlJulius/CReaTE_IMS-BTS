@@ -1,0 +1,151 @@
+
+body{
+    margin:0;
+    font-family:Arial;
+    display:flex;
+}
+
+/* Sidebar */
+
+.sidebar{
+    width:220px;
+    height:100vh;
+    background:#02321d;
+    color:white;
+    padding-top:20px;
+}
+
+.sidebar h2{
+    text-align:center;
+    margin-bottom:30px;
+}
+
+.sidebar a{
+    display:block;
+    padding:12px 20px;
+    color:white;
+    text-decoration:none;
+}
+
+.sidebar a:hover{
+    background:#34495e;
+}
+
+/* Main area */
+
+.main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+
+/* Topbar */
+
+.topbar{
+    background:#ecf0f1;
+    padding:15px;
+    border-bottom:1px solid #ccc;
+}
+
+/* Page content */
+
+.content{
+    padding:20px;
+}
+
+/* THIS IS LANDING PAGE CSS */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    height: 100vh;
+    background: url("../static/img/bg_cover.png") no-repeat center center/cover;
+    display: flex;
+    flex-direction: column; /* This stacks the Title and Container vertically */
+    justify-content: center;
+    align-items: center;
+}
+
+
+/* New styles for your Title class */
+.Title {
+    position: relative;
+    z-index: 1; /* Brings the text above the dark overlay */
+    margin-bottom: 30px; /* Adds breathing room between the title and the buttons */
+    text-align: center;
+}
+
+.Title h1 {
+    color: white; /* Makes the text white */
+    font-size: 2rem; /* Makes the title nice and big */
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7); /* Adds a subtle shadow to make it pop against the background */
+}
+
+.logo {
+    height: 200px; /* Sets a specific height */
+    width: 200px;  /* MUST have a width to show the background image */
+    background: url("../static/img/CSU-logo.png") no-repeat center center/contain; /* Changed cover to contain */
+    position: relative; 
+    z-index: 1; /* Brings the logo above the dark overlay */
+    margin-bottom: 15px; /* Adds a little space between the logo and the title */
+}
+
+.container {
+    position: relative;
+    z-index: 1; /* Brings the container above the dark overlay */
+    
+    /* Glassmorphism Styling */
+    background: rgba(255, 255, 255, 0.15); /* Semi-transparent white background */
+    backdrop-filter: blur(12px); /* Creates the frosted glass blur effect */
+    -webkit-backdrop-filter: blur(12px); /* Ensures it works on Safari */
+    border: 1px solid rgba(255, 255, 255, 0.3); /* Adds a subtle reflection edge */
+    
+    /* Original Layout Styling */
+    padding: 40px;
+    border-radius: 12px;
+    text-align: center;
+    width: 400px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* Softened the shadow slightly to fit the glass look */
+}
+
+/* Button styles */
+.btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.3s;
+    text-decoration: none; 
+    text-align: center; 
+}
+
+/* Removes margin from the last button so it aligns perfectly */
+.btn:last-child {
+    margin-bottom: 0;
+}
+
+.student-btn {
+    background-color: #007BFF;
+    color: white;
+}
+
+.student-btn:hover {
+    background-color: #0056b3;
+}
+
+.admin-btn {
+    background-color: #28a745;
+    color: white;
+}
+
+.admin-btn:hover {
+    background-color: #1e7e34;
+}

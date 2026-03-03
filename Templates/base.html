@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}CreATe Inventory Management System{% endblock %}</title>
+
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+    <link rel ="icon" type ="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
+</head>
+
+<body>
+
+<!-- Sidebar -->
+
+<div class="sidebar">
+
+    <h2>Inventory</h2>
+
+    <a href="/">Dashboard</a>
+    <a href="/inventory">View Inventory</a>
+    <a href="/add_inventory">Inventory management</a>
+    <a href="/borrow">Inventory Tracker</a>
+    <a href = "/reports">Reports</a>
+
+</div>
+
+<!-- Main section -->
+
+<div class="main">
+
+    <div class="topbar">
+        Logged in Faculty
+    </div>
+
+    <div class="content">
+
+        {% block content %}
+        {% endblock %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

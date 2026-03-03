@@ -2,10 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>CreATe Inventory Management System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel ="icon" type ="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
 </head>
 <body>
-    hello world
+
+    
+
+    <div class="logo"></div>
+
+    <div class="Title">
+        <h1>Inventory Management System</h1>
+    </div>
+
+    <div class="container">
+        <a href="STUDENT UI/student-dashboard.html" class="btn student-btn">Student Portal</a>
+        <a href="ADMIN UI/admin-login.html" class="btn admin-btn">Faculty Login</a>
+    </div>
+
 </body>
 </html>
