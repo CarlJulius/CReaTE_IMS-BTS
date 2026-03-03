@@ -5,7 +5,7 @@
     <title>CreATe Inventory Management System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
     <link rel ="icon" type ="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
 </head>
 <body>
@@ -19,7 +19,7 @@
     </div>
 
     <div class="container">
-        <a href="{{ url_for('student') }}" class="btn student-btn">Student Portal</a>
+        <a href="{{ url_for('student_information') }}" class="btn student-btn">Student Portal</a>
         <a href="{{ url_for('admin') }}" class="btn admin-btn">Faculty Login</a>
     </div>
 

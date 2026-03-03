@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Borrowed Items Tracking{% endblock %}
+
+{% block content %}
+<body>
+    <main class="main-content">
+        
+        <div class="page-header">
+            <h2>Borrowed Items Tracking</h2>
+        </div>
+
+        <div class="controls-container">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Search by student name, ID, or item...">
+            </div>
+            <select class="filter-dropdown">
+                <option value="all">All Statuses</option>
+                <option value="active">Currently Borrowed</option>
+                <option value="overdue">Overdue</option>
+                <option value="returned">Returned</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Borrow ID</th>
+                        <th>Student Details</th>
+                        <th>Item Details</th>
+                        <th>Borrow Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>BRW-201</td>
+                        <td>
+                            <strong>John Smith</strong><br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU001</span>
+                        </td>
+                        <td>MacBook Pro 16"<br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">ITM-001</span>
+                        </td>
+                        <td>2026-03-01</td>
+                        <td>2026-03-05</td>
+                        <td><span class="badge active-borrow">Borrowed</span></td>
+                        <td>
+                            <button class="action-btn return-btn"><i class="fa-solid fa-check"></i> Mark Returned</button>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>BRW-202</td>
+                        <td>
+                            <strong>Emily Davis</strong><br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU004</span>
+                        </td>
+                        <td>Projector<br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">ITM-002</span>
+                        </td>
+                        <td>2026-02-25</td>
+                        <td>2026-02-28</td>
+                        <td><span class="badge overdue">Overdue</span></td>
+                        <td>
+                            <button class="action-btn return-btn"><i class="fa-solid fa-check"></i> Mark Returned</button>
+                            <button class="icon-btn remind-btn" title="Send Reminder"><i class="fa-solid fa-bell"></i></button>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>BRW-199</td>
+                        <td>
+                            <strong>Mike Brown</strong><br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU003</span>
+                        </td>
+                        <td>Lab Beakers Set<br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">ITM-003</span>
+                        </td>
+                        <td>2026-02-20</td>
+                        <td>2026-02-22</td>
+                        <td><span class="badge returned">Returned</span></td>
+                        <td>
+                            <button class="action-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;">View Record</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+</body>
+{% endblock %}

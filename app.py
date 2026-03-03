@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory
 from forms import StudentForm, LoginForm, SignupForm, BorrowForm
 from werkzeug.security import generate_password_hash, check_password_hash
+import re
 
 
 app = Flask(__name__)
@@ -60,18 +61,65 @@ def signup():
         return redirect(url_for('admin'))
 
     return render_template('admin-signup.html', form=form)
+##########################################for login end ####################################################
 
-@app.route('/admin/dashboard')
+
+############################################ for dashboard(admin) ####################################################
+@app.route('/admin/dashboard', methods = ['GET', 'POST'])
 def admin_dashboard():
     return render_template('admin-dashboard.html')
 
-@app.route('/student')
-def student():
-    return render_template('student-login.html')
+@app.route('/admin/borrowed-items', methods = ['GET', 'POST'])
+def borrowed_items():
+    return render_template('borrowed-items.html')
+
+@app.route('/admin/inventory', methods = ['GET', 'POST'])
+def inventory():
+    return render_template('manage-inventory.html')
+
+@app.route('/admin/requests', methods = ['GET', 'POST'])
+def requests():
+    return render_template('manage-request.html')
+
+@app.route('/admin/reports', methods = ['GET', 'POST'])
+def reports():
+    return render_template('reports.html')
+
+@app.route('/admin/office', methods = ['GET', 'POST'])
+def office():
+    return render_template('manage-office.html')
+
+
+############################################for student dashboard ####################################################
+
+
+@app.route('/student/information', methods=['GET', 'POST'])
+def student_information():
+    form = StudentForm()
+    if form.validate_on_submit():
+        # normalize ID to a consistent format like '191 - 00641'
+        raw_id = form.id_number.data.strip()
+        normalized = re.sub(r'\s*-\s*', ' - ', raw_id)
+
+        # check if a student with this Student_number exists
+        student = Student.query.filter_by(Student_number=normalized).first()
+        if student:
+            student.Student_nm = form.name.data
+            flash('Student information updated.', 'success')
+        else:
+            student = Student(Student_nm=form.name.data, Student_number=normalized)
+            db.session.add(student)
+            flash('Student added successfully.', 'success')
+
+        db.session.commit()
+        return redirect(url_for('student_dashboard'))
+
+    return render_template('student-information.html', form=form)
 
 @app.route('/student/dashboard')
 def student_dashboard():
     return render_template('student-dashboard.html')
+
 
 
 

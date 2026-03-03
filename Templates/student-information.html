@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Information</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
+    <link rel ="icon" type ="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
+</head>
+<body>
+
+    <div class="logo"></div>
+
+    <div class="Title">
+        <h1>Student Information</h1>
+    </div>
+
+    <div class="container">
+        <form method="POST" action ="{{ url_for('student_dashboard') }}">
+            {{form.hidden_tag()}}
+            <div class="input-group">
+                
+                {{form.id_number(class = "form-control", placeholder = "Student ID (e.g. 221-00123)")}}
+            </div>
+            
+            <div class="input-group">
+               
+                {{form.name(class = "form-control", placeholder = "Student Name")}}
+            </div>
+
+            {{form.submit(class = "btn login-btn")}}
+        </form>
+
+        <div class="link-group">
+            <div class="back-link">
+                <a href="{{ url_for('index') }}">← Back to Landing page</a>
+            </div>
+    
+        </div>
+    </div>
+
+</body>
+</html>

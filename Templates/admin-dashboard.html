@@ -1,7 +1,100 @@
-{%extends 'base.html' %}
+{% extends "base.html" %}
+
 {% block title %}Admin Dashboard{% endblock %}
 
 {% block content %}
-    <h1>Welcome to the Admin Dashboard</h1>
-    <p>Here you can manage inventory, view reports, and track borrowed items.</p>
+<body>
+    <main class="main-content">
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-info">
+                    <p>Total Items</p>
+                    <h3>248</h3>
+                </div>
+                <i class="fa-solid fa-cube"></i>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <p>Pending Requests</p>
+                    <h3>4</h3>
+                </div>
+                <i class="fa-solid fa-clipboard"></i>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <p>Overdue Returns</p>
+                    <h3>3</h3>
+                </div>
+                <i class="fa-solid fa-book"></i>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <h2>Active Borrow Requests</h2>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Student ID</th>
+                        <th>Item</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>John Smith</td>
+                        <td>STU001</td>
+                        <td>MacBook Pro 16"</td>
+                        <td>2026-03-01</td>
+                        <td><span class="badge pending">Pending</span></td>
+                        <td>
+                            <button class="action-btn approve">Approve</button>
+                            <button class="action-btn reject">Reject</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Sarah Johnson</td>
+                        <td>STU002</td>
+                        <td>Projector</td>
+                        <td>2026-03-02</td>
+                        <td><span class="badge pending">Pending</span></td>
+                        <td>
+                            <button class="action-btn approve">Approve</button>
+                            <button class="action-btn reject">Reject</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Mike Brown</td>
+                        <td>STU003</td>
+                        <td>Lab Beakers Set</td>
+                        <td>2026-03-02</td>
+                        <td><span class="badge pending">Pending</span></td>
+                        <td>
+                            <button class="action-btn approve">Approve</button>
+                            <button class="action-btn reject">Reject</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Emily Davis</td>
+                        <td>STU004</td>
+                        <td>Office Desk Chair</td>
+                        <td>2026-03-03</td>
+                        <td><span class="badge pending">Pending</span></td>
+                        <td>
+                            <button class="action-btn approve">Approve</button>
+                            <button class="action-btn reject">Reject</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+</body>
+</html>
 {% endblock %}

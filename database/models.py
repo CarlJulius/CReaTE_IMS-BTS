@@ -25,6 +25,8 @@ class Student(db.Model):
 
     Student_id = db.Column(db.Integer, primary_key=True)
     Student_nm = db.Column(db.String(100), nullable=False)
+    # external student number in format like '221 - 00123'
+    Student_number = db.Column(db.String(20), unique=True, nullable=False)
 
 
 class Office(db.Model):

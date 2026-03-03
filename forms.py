@@ -1,10 +1,16 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired, Length 
+from wtforms.validators import DataRequired, Length, Regexp
 
 #form for getting student information
 class StudentForm(FlaskForm):
-    id_number = StringField('ID Number', validators=[DataRequired(), Length(min=1, max=20)])
+    id_number = StringField(
+        'ID Number',
+        validators=[
+            DataRequired(),
+            Regexp(r'^\d{3}\s*-\s*\d{5}$', message='ID must be like 201 - 00123')
+        ]
+    )
     name = StringField('Name', validators=[DataRequired(), Length(min=1, max=100)])
     submit = SubmitField('Submit')
 

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<body>
+
+    <main class="main-content">
+        
+        <div class="page-header">
+            <h2>Borrow Requests</h2>
+        </div>
+
+        <div class="controls-container">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Search by student name or ID...">
+            </div>
+            <select class="filter-dropdown">
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Req ID</th>
+                        <th>Student Details</th>
+                        <th>Requested Item</th>
+                        <th>Borrow Date</th>
+                        <th>Return Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>REQ-101</td>
+                        <td>
+                            <strong>John Smith</strong><br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU001</span>
+                        </td>
+                        <td>MacBook Pro 16"</td>
+                        <td>2026-03-05</td>
+                        <td>2026-03-07</td>
+                        <td><span class="badge pending">Pending</span></td>
+                        <td>
+                            <button class="action-btn approve">Approve</button>
+                            <button class="action-btn reject">Reject</button>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>REQ-102</td>
+                        <td>
+                            <strong>Sarah Johnson</strong><br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU002</span>
+                        </td>
+                        <td>Projector</td>
+                        <td>2026-03-04</td>
+                        <td>2026-03-04</td>
+                        <td><span class="badge approved">Approved</span></td>
+                        <td>
+                            <button class="action-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;">View Details</button>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>REQ-103</td>
+                        <td>
+                            <strong>Mike Brown</strong><br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU003</span>
+                        </td>
+                        <td>Lab Beakers Set</td>
+                        <td>2026-03-06</td>
+                        <td>2026-03-10</td>
+                        <td><span class="badge rejected">Rejected</span></td>
+                        <td>
+                            <button class="action-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;">View Details</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+</body>
+{% endblock %}

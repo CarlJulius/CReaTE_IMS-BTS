@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<body>
+    <main class="main-content">
+        
+        <div class="page-header">
+            <h2>Inventory List</h2>
+            <button class="action-btn add-btn"><i class="fa-solid fa-plus"></i> Add New Item</button>
+        </div>
+
+        <div class="controls-container">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" placeholder="Search items by name or ID...">
+            </div>
+            <select class="filter-dropdown">
+                <option value="all">All Categories</option>
+                <option value="electronics">Electronics</option>
+                <option value="furniture">Furniture</option>
+                <option value="lab">Lab Equipment</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item ID</th>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Total Stock</th>
+                        <th>Available</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>ITM-001</td>
+                        <td>MacBook Pro 16"</td>
+                        <td>Electronics</td>
+                        <td>15</td>
+                        <td>12</td>
+                        <td><span class="badge in-stock">In Stock</span></td>
+                        <td>
+                            <button class="icon-btn edit-btn"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button class="icon-btn delete-btn"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>ITM-002</td>
+                        <td>Projector</td>
+                        <td>Electronics</td>
+                        <td>5</td>
+                        <td>0</td>
+                        <td><span class="badge out-of-stock">Out of Stock</span></td>
+                        <td>
+                            <button class="icon-btn edit-btn"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button class="icon-btn delete-btn"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>ITM-003</td>
+                        <td>Lab Beakers Set</td>
+                        <td>Lab Equipment</td>
+                        <td>30</td>
+                        <td>28</td>
+                        <td><span class="badge in-stock">In Stock</span></td>
+                        <td>
+                            <button class="icon-btn edit-btn"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button class="icon-btn delete-btn"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+</body>
+{% endblock %}
