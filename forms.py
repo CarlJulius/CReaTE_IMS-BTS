@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired, Length, Regexp
+from wtforms import StringField, PasswordField, SubmitField, IntegerField, SelectField
+from wtforms.validators import DataRequired, Length, Regexp, NumberRange
 
 #form for getting student information
 class StudentForm(FlaskForm):
@@ -32,5 +32,20 @@ class SignupForm(FlaskForm):
 class BorrowForm(FlaskForm):
     student_id = StringField('Student ID', validators=[DataRequired(), Length(min=1, max=20)])
     inventory_id = StringField('Inventory ID', validators=[DataRequired(), Length(min=1, max=20)])
+    quantity = IntegerField('Quantity', validators=[DataRequired()])
     date_borrowed = StringField('Date Borrowed', validators=[DataRequired()])
     submit = SubmitField('Request to Borrow')
+
+
+# form to add/edit inventory items
+class InventoryForm(FlaskForm):
+    name = StringField('Item Name', validators=[DataRequired(), Length(min=1, max=100)])
+    quantity = IntegerField('Quantity', validators=[DataRequired(), NumberRange(min=0)])
+    condition = SelectField('Condition', choices=[
+        ('functional', 'Functional'),
+        ('non functional', 'Non Functional'),
+        ('under repair', 'Under Repair')
+    ], validators=[DataRequired()])
+    serial = StringField('Serial Number', validators=[DataRequired(), Length(min=1, max=100)])
+    category = StringField('Category', validators=[DataRequired(), Length(min=1, max=100)])
+    submit = SubmitField('Add Item')
