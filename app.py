@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory
 from sqlalchemy import func, or_
-from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm
+from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm
 from werkzeug.security import generate_password_hash, check_password_hash
 import re
 
@@ -184,15 +184,145 @@ def reports():
 
 @app.route('/admin/office', methods = ['GET', 'POST'])
 def office():
-    return render_template('manage-office.html')
+    form = OfficeForm()
+
+    # handle add form submission
+    if form.validate_on_submit():
+        new_office = Office(Office_nm=form.name.data.strip(), office_loc=form.location.data.strip())
+        db.session.add(new_office)
+        db.session.commit()
+        flash('Office added.', 'success')
+        return redirect(url_for('office'))
+
+    # handle optional search
+    q = request.args.get('q', '').strip()
+    if q:
+        offices = Office.query.filter(or_(Office.Office_nm.ilike(f"%{q}%"), Office.office_loc.ilike(f"%{q}%"))).all()
+    else:
+        offices = Office.query.all()
+
+    items = []
+    for off in offices:
+        items.append({
+            'id': off.Office_id,
+            'name': off.Office_nm,
+            'location': off.office_loc
+        })
+
+    return render_template('manage-office.html', items=items, add_form=form, q=q)
+
+
+@app.route('/admin/office/edit/<int:office_id>', methods=['POST'])
+def edit_office(office_id):
+    form = OfficeForm()
+    if form.validate_on_submit():
+        off = Office.query.get_or_404(office_id)
+        off.Office_nm = form.name.data.strip()
+        off.office_loc = form.location.data.strip()
+        db.session.commit()
+        flash('Office updated.', 'success')
+    else:
+        flash('Failed to update office. Check input.', 'danger')
+    return redirect(url_for('office'))
+
+
+@app.route('/admin/office/delete/<int:office_id>', methods=['POST'])
+def delete_office(office_id):
+    off = Office.query.get_or_404(office_id)
+    # Prevent deletion if there are inventories assigned to this office
+    assigned_count = Inventory.query.filter_by(Office_id=off.Office_id).count()
+    if assigned_count > 0:
+        flash('Cannot delete office with assigned inventory.', 'danger')
+        return redirect(url_for('office'))
+
+    db.session.delete(off)
+    db.session.commit()
+    flash('Office deleted.', 'success')
+    return redirect(url_for('office'))
 
 @app.route('/admin/faculty', methods = ['GET', 'POST'])
 def faculty():
-    return render_template('manage-faculty.html')
+    form = FacultyForm()
+
+    # handle add form submission
+    if form.validate_on_submit():
+        existing_user = Faculty.query.filter_by(username=form.username.data.strip()).first()
+        if existing_user:
+            flash('Username already exists', 'danger')
+            return redirect(url_for('faculty'))
+
+        # find or create office by name
+        office_name = form.office.data.strip()
+        office = Office.query.filter_by(Office_nm=office_name).first()
+        if not office:
+            office = Office(Office_nm=office_name, office_loc='')
+            db.session.add(office)
+            db.session.commit()
+
+        new_faculty = Faculty(
+            Faculty_nm=form.name.data.strip(),
+            username=form.username.data.strip(),
+            password=generate_password_hash(form.password.data.strip()),
+            Office_id=office.Office_id
+        )
+        db.session.add(new_faculty)
+        db.session.commit()
+        flash('Faculty added.', 'success')
+        return redirect(url_for('faculty'))
+
+    # handle optional search
+    q = request.args.get('q', '').strip()
+    if q:
+        faculties = Faculty.query.join(Office).filter(or_(Faculty.Faculty_nm.ilike(f"%{q}%"), Faculty.username.ilike(f"%{q}%"), Office.Office_nm.ilike(f"%{q}%"))).all()
+    else:
+        faculties = Faculty.query.all()
+
+    items = []
+    for f in faculties:
+        items.append({
+            'id': f.Faculty_id,
+            'name': f.Faculty_nm,
+            'username': f.username,
+            'office': f.office.Office_nm if getattr(f, 'office', None) else ''
+        })
+
+    return render_template('manage-faculty.html', items=items, add_form=form, q=q)
+
+
+
+@app.route('/admin/faculty/edit/<int:faculty_id>', methods=['POST'])
+def edit_faculty(faculty_id):
+    form = FacultyForm()
+    if form.validate_on_submit():
+        fac = Faculty.query.get_or_404(faculty_id)
+        fac.Faculty_nm = form.name.data.strip()
+        fac.username = form.username.data.strip()
+        if form.password.data and form.password.data.strip():
+            fac.password = generate_password_hash(form.password.data.strip())
+
+        office_name = form.office.data.strip()
+        office = Office.query.filter_by(Office_nm=office_name).first()
+        if not office:
+            office = Office(Office_nm=office_name, office_loc='')
+            db.session.add(office)
+            db.session.commit()
+
+        fac.Office_id = office.Office_id
+        db.session.commit()
+        flash('Faculty updated.', 'success')
+    else:
+        flash('Failed to update faculty. Check input.', 'danger')
+    return redirect(url_for('faculty'))
+
+
+
 
 @app.route('/admin/category', methods = ['GET', 'POST'])
 def category():
+    form = CategoryForm()
     return render_template('manage-category.html')
+
+#################################################end of dashboard(admin) ####################################################
 
 
 ############################################for student dashboard ####################################################
@@ -221,7 +351,7 @@ def student_information():
 
     return render_template('student-information.html', form=form)
 
-@app.route('/student/dashboard')
+@app.route('/student/dashboard', methods=['GET', 'POST'])
 def student_dashboard():
     return render_template('student-dashboard.html')
 

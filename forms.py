@@ -49,3 +49,22 @@ class InventoryForm(FlaskForm):
     serial = StringField('Serial Number', validators=[DataRequired(), Length(min=1, max=100)])
     category = StringField('Category', validators=[DataRequired(), Length(min=1, max=100)])
     submit = SubmitField('Add Item')
+
+# form to add/edit office information
+class OfficeForm(FlaskForm):
+    name = StringField('Office Name', validators=[DataRequired(), Length(min=1, max=100)])
+    location = StringField('Location', validators=[DataRequired(), Length(min=1, max=100)])
+    submit = SubmitField('Add Office')
+
+# form to add/edit category information
+class CategoryForm(FlaskForm):
+    name = StringField('Category Name', validators=[DataRequired(), Length(min=1, max=100)])
+    submit = SubmitField('Add Category')
+
+# form to add/edit faculty information
+class FacultyForm(FlaskForm):
+    name = StringField('Faculty Name', validators=[DataRequired(), Length(min=1, max=100)])
+    username = StringField('Username', validators=[DataRequired(), Length(min=1, max=50)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=1, max=100)])
+    office = StringField('Office', validators=[DataRequired(), Length(min=1, max=20)])
+    submit = SubmitField('Add Faculty')

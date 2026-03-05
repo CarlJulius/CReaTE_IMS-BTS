@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CReATe — Borrow Request</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* Borrow form body override — undoes landing page centering */
+  body {
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    justify-content: flex-start;
+    align-items: stretch;
+    font-family: 'Sora', sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<!-- BACKGROUND SPLIT -->
+<div class="page-bg">
+  <div class="bg-image-panel"></div>
+  <div class="bg-white-panel"></div>
+</div>
+
+<!-- NAV -->
+<nav class="borrow-nav">
+  <a class="nav-brand" href="#">
+    <img src="CSU-logo.png" alt="CReATe Logo" class="nav-brand-logo" onerror="this.style.display='none'">
+    <div class="nav-brand-text">
+      <span class="nav-brand-title">College of Engineering and Geosciences</span>
+      <span class="nav-brand-sub">Caraga State University</span>
+    </div>
+  </a>
+  <a class="nav-back-btn" href="#">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    Back
+  </a>
+</nav>
+
+<!-- PROGRESS BAR -->
+<div class="borrow-progress-bar">
+  <div class="borrow-progress-fill" id="progressFill"></div>
+</div>
+
+<!-- PAGE BODY -->
+<div class="borrow-page-body">
+  <div class="borrow-form-card">
+
+    <!-- CARD HEADER -->
+    <div class="borrow-card-header">
+      <h1>Request for Facility/ Equipment Use</h1>
+      <p>Fill in your details and submit. We'll confirm within a few hours.</p>
+    </div>
+
+    <!-- SELECTED ITEM CHIP -->
+    <div class="item-chip">
+      <div class="item-chip-icon">💻</div>
+      <div>
+        <div class="item-chip-name">Item Name</div>
+        <div class="item-chip-label">Selected item · Available</div>
+      </div>
+    </div>
+
+    <!-- PERSONAL INFO -->
+    <div class="section-divider"><span>Personal Information</span></div>
+
+    <div class="borrow-form-row">
+      <div class="borrow-form-group">
+        <label for="firstName">First Name</label>
+        <input type="text" id="firstName" placeholder="Maria" autocomplete="given-name">
+      </div>
+      <div class="borrow-form-group">
+        <label for="lastName">Last Name</label>
+        <input type="text" id="lastName" placeholder="Santos" autocomplete="family-name">
+      </div>
+    </div>
+
+    <div class="borrow-form-group">
+      <label for="studentId">Student ID</label>
+      <input type="text" id="studentId" placeholder="213-01234">
+    </div>
+
+    <div class="borrow-form-group">
+      <label for="email">School Email</label>
+      <input type="email" id="email" placeholder="you@school.edu" autocomplete="email">
+    </div>
+
+    <div class="borrow-form-group">
+      <label for="department">College / Department</label>
+      <input type="text" id="department" placeholder="e.g. College of Engineering">
+    </div>
+
+    <div class="borrow-form-group">
+      <label for="courseYear">Course &amp; Year</label>
+      <input type="text" id="courseYear" placeholder="e.g. BSCE 3rd year">
+    </div>
+
+    <div class="borrow-form-row">
+      <div class="borrow-form-group">
+        <label for="subjectCode">Course Code / Subject</label>
+        <input type="text" id="subjectCode" placeholder="e.g. ABE 199 Thesis">
+      </div>
+      <div class="borrow-form-group">
+        <label for="dateFilled">Date</label>
+        <input type="date" id="dateFilled">
+      </div>
+    </div>
+
+    <!-- BORROW DETAILS -->
+    <div class="section-divider"><span>Borrow Details</span></div>
+
+    <div class="borrow-form-row">
+      <div class="borrow-form-group">
+        <label for="borrowDate">Borrow Date</label>
+        <input type="date" id="borrowDate">
+      </div>
+      <div class="borrow-form-group">
+        <label for="returnDate">Return Date</label>
+        <input type="date" id="returnDate">
+      </div>
+    </div>
+
+    <div class="borrow-form-group">
+      <label for="purpose">Purpose / Notes</label>
+      <textarea id="purpose" placeholder="e.g. For our Physics lab experiment next week…"></textarea>
+    </div>
+
+    <!-- SUBMIT -->
+    <button class="submit-btn" onclick="submitForm()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+      </svg>
+      Submit Request
+    </button>
+
+  </div>
+</div>
+
+<!-- SUCCESS OVERLAY -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <h2>Request Submitted!</h2>
+    <p>Your borrow request has been received. We'll send a confirmation to your school email shortly.</p>
+    <div class="ref-badge" id="refBadge">CSU-2026-0000</div>
+    <button class="success-close" onclick="document.getElementById('successOverlay').classList.remove('show')">
+      Done
+    </button>
+  </div>
+</div>
+
+<script>
+  const today = new Date();
+  document.getElementById('dateFilled').value = fmt(today); // Auto-fills Date Filled with today's date
+  const fmt = d => d.toISOString().split('T')[0];
+  document.getElementById('borrowDate').value = fmt(today);
+  const ret = new Date(today); ret.setDate(ret.getDate() + 3);
+  document.getElementById('returnDate').value = fmt(ret);
+
+  const fields = ['firstName','lastName','studentId','email','department','courseYear','subjectCode','dateFilled','borrowDate','returnDate','purpose'];
+  function updateProgress() {
+    const filled = fields.filter(id => document.getElementById(id).value.trim() !== '').length;
+    document.getElementById('progressFill').style.width = (20 + (filled / fields.length) * 80) + '%';
+  }
+  fields.forEach(id => document.getElementById(id).addEventListener('input', updateProgress));
+
+  function submitForm() {
+    const ref = 'CSU-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('refBadge').textContent = ref;
+    document.getElementById('successOverlay').classList.add('show');
+    document.getElementById('progressFill').style.width = '100%';
+  }
+</script>
+</body>
+</html>
