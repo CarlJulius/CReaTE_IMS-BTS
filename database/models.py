@@ -1,4 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import Enum
+from datetime import datetime, UTC, timezone
 
 db = SQLAlchemy()
 
@@ -7,11 +9,27 @@ class BorrowTracker(db.Model):
     __tablename__ = 'borrow_tracker'
 
     Borrow_id = db.Column(db.Integer, primary_key=True)
-    Borrow_date = db.Column(db.Date, nullable=False)
+
+    request_date = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    approve_date = db.Column(db.DateTime, nullable=True)
+    Borrow_date = db.Column(db.Date, nullable=True)
     Return_date = db.Column(db.Date, nullable=True)
 
     borrow_quantity = db.Column(db.Integer, nullable=False)
-    status = db.Column(db.String(50), default='borrowed', nullable=False)
+
+    status = db.Column(
+        Enum(
+            'pending',
+            'approved',
+            'rejected',
+            'borrowed',
+            'returned',
+            'overdue',
+            name='borrow_status'
+        ),
+        default='pending',
+        nullable=False
+    )
 
     Student_id = db.Column(db.Integer, db.ForeignKey('student.Student_id'), nullable=False)
     InventoryID = db.Column(db.Integer, db.ForeignKey('inventory.InventoryID'), nullable=False)
@@ -27,6 +45,8 @@ class Student(db.Model):
     Student_nm = db.Column(db.String(100), nullable=False)
     # external student number in format like '221 - 00123'
     Student_number = db.Column(db.String(20), unique=True, nullable=False)
+    student_year = db.Column(db.String(20), nullable=False)
+    student_course = db.Column(db.String(50), nullable=False)
 
 
 class Office(db.Model):

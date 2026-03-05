@@ -3,7 +3,9 @@ from database.models import db, BorrowTracker, Student, Office, Faculty, Categor
 from sqlalchemy import func, or_
 from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timezone, UTC
 import re
+
 
 
 app = Flask(__name__)
@@ -123,7 +125,7 @@ def inventory():
     for inv in inventories:
         borrowed_qty = db.session.query(func.coalesce(func.sum(BorrowTracker.borrow_quantity), 0)).filter(
             BorrowTracker.InventoryID == inv.InventoryID,
-            BorrowTracker.status == 'borrowed'
+            BorrowTracker.status == 'approved'
         ).scalar() or 0
 
         available = inv.Quantity - borrowed_qty
@@ -174,9 +176,47 @@ def delete_inventory(item_id):
     flash('Inventory item deleted.', 'success')
     return redirect(url_for('inventory'))
 
-@app.route('/admin/requests', methods = ['GET', 'POST'])
+@app.route('/admin/requests')
 def requests():
-    return render_template('manage-request.html')
+    pending_requests = BorrowTracker.query.filter_by(status='pending').all()
+    return render_template('manage-request.html', requests=pending_requests)
+
+from datetime import datetime
+
+@app.route('/admin/requests/approve/<int:borrow_id>', methods=['POST'])
+def approve_request(borrow_id):
+    borrow = BorrowTracker.query.get_or_404(borrow_id)
+
+    if borrow.status != 'pending':
+        flash('Request already processed.', 'warning')
+        return redirect(url_for('requests'))
+
+    inventory = borrow.inventory
+
+    if inventory.Quantity >= borrow.borrow_quantity:
+        inventory.Quantity -= borrow.borrow_quantity
+        borrow.status = 'approved'
+        borrow.approve_date = datetime.now(timezone.utc)
+        db.session.commit()
+        flash('Request approved.', 'success')
+    else:
+        flash('Not enough stock.', 'danger')
+
+    return redirect(url_for('requests'))
+
+@app.route('/admin/requests/reject/<int:borrow_id>', methods=['POST'])
+def reject_request(borrow_id):
+    borrow = BorrowTracker.query.get_or_404(borrow_id)
+
+    if borrow.status != 'pending':
+        flash('Request already processed.', 'warning')
+        return redirect(url_for('requests'))
+
+    borrow.status = 'rejected'
+    db.session.commit()
+
+    flash('Request rejected.', 'info')
+    return redirect(url_for('requests'))
 
 @app.route('/admin/reports', methods = ['GET', 'POST'])
 def reports():
@@ -332,64 +372,130 @@ def category():
 def student_information():
     form = StudentForm()
     if form.validate_on_submit():
-        # normalize ID to a consistent format like '191 - 00641'
-        raw_id = form.id_number.data.strip()
-        normalized = re.sub(r'\s*-\s*', ' - ', raw_id)
-
-        # check if a student with this Student_number exists
-        student = Student.query.filter_by(Student_number=normalized).first()
-        if student:
-            student.Student_nm = form.name.data
-            flash('Student information updated.', 'success')
-        else:
-            student = Student(Student_nm=form.name.data, Student_number=normalized)
-            db.session.add(student)
-            flash('Student added successfully.', 'success')
-
+        new_student = Student(
+            Student_nm=form.name.data.strip(),
+            Student_number=form.student_id.data.strip(),
+            student_course=form.course.data.strip(),
+            student_year=form.year.data.strip()
+        )
+        db.session.add(new_student)
         db.session.commit()
-        return redirect(url_for('student_dashboard'))
+        flash('Student added successfully.', 'success')
+        return redirect(url_for('student_information'))
 
     return render_template('student-information.html', form=form)
 
 @app.route('/student/dashboard', methods=['GET', 'POST'])
 def student_dashboard():
-    return render_template('student-dashboard.html')
+    # Get filters from query parameters
+    search = request.args.get('search', '').strip()
+    category_filter = request.args.get('category', 'all')
+
+    # Start query
+    inventories = Inventory.query
+
+    # Apply category filter
+    if category_filter != 'all':
+        inventories = inventories.join(Inventory.category).filter(Inventory.category.has(Category_nm=category_filter))
+
+    # Apply search filter
+    if search:
+        search_pattern = f"%{search}%"
+        inventories = inventories.filter(
+            or_(
+                Inventory.Inventory_nm.ilike(search_pattern),
+                Inventory.Serial_number.ilike(search_pattern),
+                Inventory.Inventory_condition.ilike(search_pattern),
+                Inventory.category.has(Category.Category_nm.ilike(search_pattern))
+            )
+        )
+
+    inventories = inventories.all()
+
+    # Build items list
+    items = []
+    for inventory in inventories:
+        approved_qty = db.session.query(func.coalesce(func.sum(BorrowTracker.borrow_quantity),0)).filter(
+            BorrowTracker.InventoryID == inventory.InventoryID,
+            BorrowTracker.status == 'approved'
+        ).scalar() or 0
+        
+        available = inventory.Quantity - approved_qty
+
+        items.append({
+            'id': inventory.InventoryID,
+            'name': inventory.Inventory_nm,
+            'category': inventory.category.Category_nm if getattr(inventory, 'category', None) else '',
+            'desc': f"serial: {inventory.Serial_number}, condition: {inventory.Inventory_condition}",
+            'available': available > 0,
+            'quantity': available
+        })
+
+    # Stats for hero section
+    total_items = len(items)
+    available_items = sum(1 for i in items if i['available'])
+    categories = set(i['category'] for i in items)
+
+    return render_template(
+        'student-dashboard.html',
+        items=items,
+        total_items=total_items,
+        available_items=available_items,
+        categories=len(categories),
+        current_category=category_filter,
+        search_query=search
+    )
+
 
 @app.route('/student/borrow', methods=['GET', 'POST'])
 def student_borrow():
     form = BorrowForm()
+
+    inventory_id = request.args.get('inventory_id')
+
+    inventory_item = None
+    if inventory_id:
+        inventory_item = Inventory.query.get(inventory_id)
+        if inventory_item:
+            form.inventory_id.data = inventory_item.InventoryID
+
     if form.validate_on_submit():
-        student = Student.query.filter_by(Student_number=form.student_id.data.strip()).first()
-        inventory_item = Inventory.query.filter_by(InventoryID=form.inventory_id.data.strip()).first()
+
+        student = Student.query.filter_by(
+            Student_number=form.student_id.data.strip()
+        ).first()
 
         if not student:
             flash('Student not found.', 'danger')
-            return render_template('student-borrow.html', form=form)
+            return render_template('student-borrow.html',
+                                   form=form,
+                                   inventory=inventory_item)
+
+        inventory_item = Inventory.query.get(form.inventory_id.data)
 
         if not inventory_item:
-            flash('Inventory item not found.', 'danger')
-            return render_template('student-borrow.html', form=form)
+            flash('Inventory not found.', 'danger')
+            return render_template('student-borrow.html',
+                                   form=form,
+                                   inventory=None)
 
-        if inventory_item.Quantity < 1:
-            flash('Item is currently unavailable.', 'warning')
-            return render_template('student-borrow.html', form=form)
-
+        # Create request (PENDING)
         borrow_record = BorrowTracker(
-            borrow_quantity=1,
+            borrow_quantity=form.quantity.data,
             Student_id=student.Student_id,
-            InventoryID=inventory_item.InventoryID
+            InventoryID=inventory_item.InventoryID,
+            status='pending'
         )
-        inventory_item.Quantity -= 1
 
         db.session.add(borrow_record)
         db.session.commit()
-        flash('Borrow request submitted successfully!', 'success')
+
+        flash('Borrow request submitted! Waiting for approval.', 'success')
         return redirect(url_for('student_dashboard'))
 
-    return render_template('student-borrow.html', form=form)
-
-
-
+    return render_template('student-borrow.html',
+                           form=form,
+                           inventory=inventory_item)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)
