@@ -18,7 +18,11 @@
     </div>
   </div>
   <div class="nav-user">
-    <span style="font-size:0.78rem">Hello, Student</span>
+    <span style="font-size:0.78rem">Hello, {{ student.name }}</span>
+    <a href="{{url_for('student_logout')}}">
+      <button class="nav-logout">Logout</button>
+
+    </a>
     <div class="nav-avatar">S</div>
   </div>
 </nav>

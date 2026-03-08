@@ -1,35 +1,31 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
-from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, Response
+from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory, EquipmentApprover, Reports
 from sqlalchemy import func, or_
 from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timezone, UTC
-import re
-
-
+from datetime import datetime, timezone, timedelta
+import io
+import csv
 
 app = Flask(__name__)
 
-#database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = 'your_secret_key'
 
-
-#initialize the database
 db.init_app(app)
 
-#create the database tables
 with app.app_context():
     db.create_all()
 
+
+
+# Routes for admin and student interfaces/landing page
 @app.route('/')
 def index():
     return render_template('index.html')
 
-################################################ for login ####################################################
-
-#route for admin login
+######################Admin login#########################
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     form = LoginForm()
@@ -37,12 +33,10 @@ def admin():
         faculty = Faculty.query.filter_by(username=form.username.data).first()
         if faculty and check_password_hash(faculty.password, form.password.data):
             return redirect(url_for('admin_dashboard'))
-        else:   
+        else:
             flash('Invalid username or password', 'danger')
-
     return render_template('admin-login.html', form=form)
 
-#route for admin signup
 @app.route('/admin/signup', methods=['GET', 'POST'])
 def signup():
     form = SignupForm()
@@ -56,132 +50,233 @@ def signup():
             flash('Username already exists', 'danger')
             return render_template('admin-signup.html', form=form)
 
+        office = Office.query.first()
+        if not office:
+            office = Office(office_nm="Default Office", office_loc="Main Building")
+            db.session.add(office)
+            db.session.commit()
+
         hashed_password = generate_password_hash(form.password.data)
-        new_faculty = Faculty(username=form.username.data, password=hashed_password, Faculty_nm=form.username.data, Office_id=1)  # Assuming office_id is 1 for simplicity
+        new_faculty = Faculty(
+            username=form.username.data,
+            password=hashed_password,
+            faculty_nm=form.username.data,
+            office_id=office.office_id
+        )
         db.session.add(new_faculty)
         db.session.commit()
         flash('Account created successfully! Please log in.', 'success')
         return redirect(url_for('admin'))
 
     return render_template('admin-signup.html', form=form)
-##########################################for login end ####################################################
 
+#########################Admin dashboard and management pages#########################
 
-############################################ for dashboard(admin) ####################################################
-@app.route('/admin/dashboard', methods = ['GET', 'POST'])
+@app.route('/admin/dashboard', methods=['GET', 'POST'])
 def admin_dashboard():
-    return render_template('admin-dashboard.html')
+    from sqlalchemy.orm import joinedload
 
-@app.route('/admin/borrowed-items', methods = ['GET', 'POST'])
+    total_items = Inventory.query.count()
+    pending_count = BorrowTracker.query.filter_by(status='pending').count()
+    overdue_count = BorrowTracker.query.filter_by(status='overdue').count()
+
+    recent_requests = (
+        BorrowTracker.query
+        .options(
+            joinedload(BorrowTracker.student),
+            joinedload(BorrowTracker.inventory)
+        )
+        .filter(BorrowTracker.status == 'pending')
+        .order_by(BorrowTracker.request_date.desc())
+        .limit(5)
+        .all()
+    )
+
+    return render_template(
+        'admin-dashboard.html',
+        total_items=total_items,
+        pending_count=pending_count,
+        overdue_count=overdue_count,
+        recent_requests=recent_requests
+    )
+
+@app.route('/admin/borrowed-items', methods=['GET', 'POST'])
 def borrowed_items():
-    return render_template('borrowed-items.html')
+    from sqlalchemy.orm import joinedload, contains_eager
 
-@app.route('/admin/inventory', methods = ['GET', 'POST'])
+    q = request.args.get('q', '').strip()
+
+    if q:
+        items = (
+            BorrowTracker.query
+            .join(BorrowTracker.student)
+            .options(
+                contains_eager(BorrowTracker.student),
+                joinedload(BorrowTracker.inventory)
+            )
+            .filter(BorrowTracker.status.in_(['approved', 'borrowed', 'overdue']))
+            .filter(
+                or_(
+                    Student.student_nm.ilike(f"%{q}%"),
+                    Student.student_number.ilike(f"%{q}%")
+                )
+            )
+            .all()
+        )
+    else:
+        items = (
+            BorrowTracker.query
+            .options(
+                joinedload(BorrowTracker.student),
+                joinedload(BorrowTracker.inventory)
+            )
+            .filter(BorrowTracker.status.in_(['approved', 'borrowed', 'overdue']))
+            .all()
+        )
+
+    return render_template('borrowed-items.html', items=items, q=q)
+
+@app.route('/admin/borrowed-items/return/<int:borrow_id>', methods=['POST'])
+def mark_returned(borrow_id):
+    borrow = BorrowTracker.query.get_or_404(borrow_id)
+    borrow.status = 'returned'
+    borrow.inventory.is_available = True
+    db.session.commit()
+    flash('Item marked as returned.', 'success')
+    return redirect(url_for('borrowed_items'))
+
+@app.route('/admin/inventory', methods=['GET', 'POST'])
 def inventory():
     add_form = InventoryForm()
+    office_list = Office.query.all()
 
-    # If add form submitted, create new inventory item
     if add_form.validate_on_submit():
         cat_name = add_form.category.data.strip()
-        category = Category.query.filter_by(Category_nm=cat_name).first()
+        category = Category.query.filter_by(category_nm=cat_name).first()
         if not category:
-            category = Category(Category_nm=cat_name)
+            category = Category(category_nm=cat_name)
             db.session.add(category)
             db.session.commit()
 
+        office = Office.query.first()
+        if not office:
+            office = Office(office_nm="Default Office", office_loc="Main Building")
+            db.session.add(office)
+            db.session.commit()
+
         new_inv = Inventory(
-            Inventory_nm=add_form.name.data.strip(),
-            Quantity=add_form.quantity.data,
-            Inventory_condition=add_form.condition.data.strip(),
-            Serial_number=add_form.serial.data.strip(),
-            Faculty_id=1,
-            Office_id=1,
-            Category_id=category.Category_id
+            inventory_nm=add_form.name.data.strip(),
+            inventory_desc=add_form.desc.data.strip() if add_form.desc.data else None,
+            inventory_condition=add_form.condition.data.strip(),
+            serial_number=add_form.serial.data.strip(),
+            office_id=office.office_id,
+            category_id=category.category_id
         )
+
         db.session.add(new_inv)
         db.session.commit()
         flash('Inventory item added.', 'success')
         return redirect(url_for('inventory'))
 
-    # handle search query
     q = request.args.get('q', '').strip()
+
     if q:
         inv_query = Inventory.query.outerjoin(Category)
-        # if q is integer, search by ID as well
-        if q.isdigit():
-            inv_query = inv_query.filter(or_(Inventory.InventoryID == int(q),
-                                             Inventory.Inventory_nm.ilike(f"%{q}%"),
-                                             Inventory.Serial_number.ilike(f"%{q}%"),
-                                             Category.Category_nm.ilike(f"%{q}%")))
-        else:
-            inv_query = inv_query.filter(or_(Inventory.Inventory_nm.ilike(f"%{q}%"),
-                                             Inventory.Serial_number.ilike(f"%{q}%"),
-                                             Category.Category_nm.ilike(f"%{q}%")))
+        inv_query = inv_query.filter(
+            or_(
+                Inventory.inventory_nm.ilike(f"%{q}%"),
+                Inventory.serial_number.ilike(f"%{q}%"),
+                Category.category_nm.ilike(f"%{q}%")
+            )
+        )
         inventories = inv_query.all()
     else:
-        # Query all inventory items and compute available stock
         inventories = Inventory.query.all()
+
     items = []
     for inv in inventories:
-        borrowed_qty = db.session.query(func.coalesce(func.sum(BorrowTracker.borrow_quantity), 0)).filter(
-            BorrowTracker.InventoryID == inv.InventoryID,
-            BorrowTracker.status == 'approved'
-        ).scalar() or 0
-
-        available = inv.Quantity - borrowed_qty
         items.append({
-            'id': inv.InventoryID,
-            'name': inv.Inventory_nm,
-            'category': inv.category.Category_nm if getattr(inv, 'category', None) else '',
-            'condition': inv.Inventory_condition,
-            'serial': inv.Serial_number,
-            'total': inv.Quantity,
-            'available': available,
-            'status': 'In Stock' if available > 0 else 'Out of Stock'
+            'id': inv.inventory_id,
+            'name': inv.inventory_nm,
+            'category': inv.category.category_nm if inv.category else '',
+            'desc': inv.inventory_desc,
+            'office': inv.office.office_nm if inv.office else '',
+            'condition': inv.inventory_condition,
+            'serial': inv.serial_number,
+            'available': inv.is_available,
+            'status': 'Available' if inv.is_available else 'Borrowed'
         })
 
-    return render_template('manage-inventory.html', items=items, add_form=add_form, q=q)
-
+    return render_template('manage-inventory.html', items=items, add_form=add_form, q=q, office_list=office_list)
 
 @app.route('/admin/inventory/edit/<int:item_id>', methods=['POST'])
 def edit_inventory(item_id):
     form = InventoryForm()
     if form.validate_on_submit():
         inv = Inventory.query.get_or_404(item_id)
-        inv.Inventory_nm = form.name.data.strip()
-        inv.Quantity = form.quantity.data
-        inv.Inventory_condition = form.condition.data.strip()
-        inv.Serial_number = form.serial.data.strip()
+
+        # Update basic fields
+        inv.inventory_nm = form.name.data.strip()
+        inv.inventory_condition = form.condition.data.strip()
+        inv.serial_number = form.serial.data.strip()
+        inv.inventory_desc = form.desc.data.strip() if form.desc.data else None
+
+        # Update category
         cat_name = form.category.data.strip()
-        category = Category.query.filter_by(Category_nm=cat_name).first()
+        category = Category.query.filter_by(category_nm=cat_name).first()
         if not category:
-            category = Category(Category_nm=cat_name)
+            category = Category(category_nm=cat_name)
             db.session.add(category)
             db.session.commit()
-        inv.Category_id = category.Category_id
+        inv.category_id = category.category_id
+
+        # Update office
+        inv.office_id = form.office.data  
+
         db.session.commit()
         flash('Inventory item updated.', 'success')
     else:
-        flash('Failed to update item. Check input.', 'danger')
-    return redirect(url_for('inventory'))
+        flash('Failed to update item.', 'danger')
 
+    return redirect(url_for('inventory'))
 
 @app.route('/admin/inventory/delete/<int:item_id>', methods=['POST'])
 def delete_inventory(item_id):
     inv = Inventory.query.get_or_404(item_id)
-    # remove associated borrow records first
-    BorrowTracker.query.filter_by(InventoryID=inv.InventoryID).delete()
+    BorrowTracker.query.filter_by(inventory_id=inv.inventory_id).delete()
     db.session.delete(inv)
     db.session.commit()
     flash('Inventory item deleted.', 'success')
     return redirect(url_for('inventory'))
 
+from sqlalchemy.orm import joinedload
+
 @app.route('/admin/requests')
 def requests():
-    pending_requests = BorrowTracker.query.filter_by(status='pending').all()
-    return render_template('manage-request.html', requests=pending_requests)
 
-from datetime import datetime
+    q = request.args.get('q', '').strip()
+
+    query = BorrowTracker.query.options(
+        joinedload(BorrowTracker.student),
+        joinedload(BorrowTracker.inventory)
+    ).filter(BorrowTracker.status == 'pending')
+
+    if q:
+        query = query.join(Student).filter(
+            or_(
+                Student.student_nm.ilike(f"%{q}%"),
+                Student.student_number.ilike(f"%{q}%")
+            )
+        )
+
+    pending_requests = query.all()
+    
+
+    return render_template(
+        'manage-request.html',
+        requests=pending_requests,
+        q=q
+    )
 
 @app.route('/admin/requests/approve/<int:borrow_id>', methods=['POST'])
 def approve_request(borrow_id):
@@ -191,247 +286,391 @@ def approve_request(borrow_id):
         flash('Request already processed.', 'warning')
         return redirect(url_for('requests'))
 
-    inventory = borrow.inventory
+    borrow.status = 'approved'
+    borrow.approve_date = datetime.now(timezone.utc)
+    borrow.remarks = request.form.get('remarks', '').strip() or borrow.remarks
 
-    if inventory.Quantity >= borrow.borrow_quantity:
-        inventory.Quantity -= borrow.borrow_quantity
-        borrow.status = 'approved'
-        borrow.approve_date = datetime.now(timezone.utc)
-        db.session.commit()
-        flash('Request approved.', 'success')
-    else:
-        flash('Not enough stock.', 'danger')
+    borrow_date = request.form.get('borrow_date')
+    return_date = request.form.get('return_date')
 
+    if borrow_date:
+        borrow.borrow_date = datetime.strptime(borrow_date, '%Y-%m-%d').date()
+    if return_date:
+        borrow.return_date = datetime.strptime(return_date, '%Y-%m-%d').date()
+
+    borrow.inventory.is_available = False
+    db.session.commit()
+
+    flash('Request approved.', 'success')
     return redirect(url_for('requests'))
 
 @app.route('/admin/requests/reject/<int:borrow_id>', methods=['POST'])
 def reject_request(borrow_id):
     borrow = BorrowTracker.query.get_or_404(borrow_id)
-
     if borrow.status != 'pending':
         flash('Request already processed.', 'warning')
         return redirect(url_for('requests'))
 
     borrow.status = 'rejected'
+    borrow.remarks = request.form.get('remarks', '').strip() or borrow.remarks
     db.session.commit()
 
     flash('Request rejected.', 'info')
     return redirect(url_for('requests'))
 
-@app.route('/admin/reports', methods = ['GET', 'POST'])
+@app.route('/admin/reports', methods=['GET', 'POST'])
 def reports():
-    return render_template('reports.html')
+    from sqlalchemy.orm import joinedload
 
-@app.route('/admin/office', methods = ['GET', 'POST'])
+    # Date filters
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    query = BorrowTracker.query
+
+    if date_from:
+        query = query.filter(BorrowTracker.request_date >= datetime.strptime(date_from, '%Y-%m-%d'))
+    if date_to:
+        query = query.filter(BorrowTracker.request_date <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+
+    # Stats
+    total_borrows = query.count()
+    damage_reports = Reports.query.count()
+
+    # Most borrowed item
+    most_borrowed = (
+        db.session.query(Inventory.inventory_nm, func.count(BorrowTracker.inventory_id).label('borrow_count'))
+        .join(BorrowTracker, BorrowTracker.inventory_id == Inventory.inventory_id)
+        .group_by(Inventory.inventory_nm)
+        .order_by(func.count(BorrowTracker.inventory_id).desc())
+        .first()
+    )
+
+    # Past 7 days activity
+    today = datetime.now(timezone.utc).date()
+    days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
+    daily_counts = []
+    max_count = 1
+
+    for day in days:
+        count = BorrowTracker.query.filter(
+            func.date(BorrowTracker.request_date) == day
+        ).count()
+        daily_counts.append({'day': day.strftime('%a'), 'count': count})
+        if count > max_count:
+            max_count = count
+
+    # Calculate bar heights as percentages
+    for d in daily_counts:
+        d['height'] = int((d['count'] / max_count) * 100) if max_count > 0 else 0
+
+    return render_template(
+        'reports.html',
+        total_borrows=total_borrows,
+        most_borrowed=most_borrowed.inventory_nm if most_borrowed else 'N/A',
+        damage_reports=damage_reports,
+        daily_counts=daily_counts,
+        date_from=date_from,
+        date_to=date_to
+    )
+
+@app.route('/admin/reports/export')
+def export_csv():
+    records = BorrowTracker.query.options(
+        joinedload(BorrowTracker.student),
+        joinedload(BorrowTracker.inventory)
+    ).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Borrow ID', 'Student Name', 'Student Number', 'Item', 'Status', 'Request Date', 'Borrow Date', 'Return Date', 'Remarks'])
+
+    for r in records:
+        writer.writerow([
+            r.borrow_id,
+            r.student.student_nm,
+            r.student.student_number,
+            r.inventory.inventory_nm,
+            r.status,
+            r.request_date.strftime('%Y-%m-%d %H:%M') if r.request_date else '',
+            r.borrow_date.strftime('%Y-%m-%d') if r.borrow_date else '',
+            r.return_date.strftime('%Y-%m-%d') if r.return_date else '',
+            r.remarks or ''
+        ])
+
+    output.seek(0)
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=borrow_report.csv'}
+    )
+
+@app.route('/admin/office', methods=['GET', 'POST'])
 def office():
     form = OfficeForm()
+    faculty_list = Faculty.query.all()
 
-    # handle add form submission
     if form.validate_on_submit():
-        new_office = Office(Office_nm=form.name.data.strip(), office_loc=form.location.data.strip())
+        new_office = Office(
+            office_nm=form.name.data.strip(),
+            office_loc=form.location.data.strip()
+        )
         db.session.add(new_office)
         db.session.commit()
         flash('Office added.', 'success')
         return redirect(url_for('office'))
 
-    # handle optional search
     q = request.args.get('q', '').strip()
+
     if q:
-        offices = Office.query.filter(or_(Office.Office_nm.ilike(f"%{q}%"), Office.office_loc.ilike(f"%{q}%"))).all()
+        offices = Office.query.filter(
+            or_(
+                Office.office_nm.ilike(f"%{q}%"),
+                Office.office_loc.ilike(f"%{q}%")
+            )
+        ).all()
     else:
         offices = Office.query.all()
 
-    items = []
-    for off in offices:
-        items.append({
-            'id': off.Office_id,
-            'name': off.Office_nm,
-            'location': off.office_loc
-        })
+   
 
-    return render_template('manage-office.html', items=items, add_form=form, q=q)
-
+    return render_template('manage-office.html', add_form=form, q=q, faculty_list=faculty_list, offices=offices)
 
 @app.route('/admin/office/edit/<int:office_id>', methods=['POST'])
 def edit_office(office_id):
     form = OfficeForm()
     if form.validate_on_submit():
         off = Office.query.get_or_404(office_id)
-        off.Office_nm = form.name.data.strip()
+        off.office_nm = form.name.data.strip()
         off.office_loc = form.location.data.strip()
         db.session.commit()
         flash('Office updated.', 'success')
     else:
-        flash('Failed to update office. Check input.', 'danger')
-    return redirect(url_for('office'))
+        flash('Failed to update office.', 'danger')
 
+    return redirect(url_for('office'))
 
 @app.route('/admin/office/delete/<int:office_id>', methods=['POST'])
 def delete_office(office_id):
     off = Office.query.get_or_404(office_id)
-    # Prevent deletion if there are inventories assigned to this office
-    assigned_count = Inventory.query.filter_by(Office_id=off.Office_id).count()
+
+    assigned_count = Inventory.query.filter_by(office_id=off.office_id).count()
+
     if assigned_count > 0:
         flash('Cannot delete office with assigned inventory.', 'danger')
         return redirect(url_for('office'))
 
     db.session.delete(off)
     db.session.commit()
+
     flash('Office deleted.', 'success')
     return redirect(url_for('office'))
 
-@app.route('/admin/faculty', methods = ['GET', 'POST'])
+@app.route('/admin/office/assign/<int:office_id>', methods=['POST'])
+def assign_office_head(office_id):
+    faculty_id = request.form.get('faculty_id')
+    
+    if not faculty_id:
+        flash("Please select a faculty member.", "error")
+        return redirect(url_for('office'))
+
+    # Check if an approver record already exists for this office
+    existing_record = EquipmentApprover.query.filter_by(office_id=office_id).first()
+
+    if existing_record:
+        # Update existing
+        existing_record.faculty_id = faculty_id
+    else:
+        # Create new
+        new_head = EquipmentApprover(office_id=office_id, faculty_id=faculty_id)
+        db.session.add(new_head)
+
+    try:
+        db.session.commit()
+        flash("Office head assigned successfully!", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash("Error assigning office head.", "error")
+
+    return redirect(url_for('office'))
+
+@app.route('/admin/faculty', methods=['GET', 'POST'])
 def faculty():
     form = FacultyForm()
 
-    # handle add form submission
     if form.validate_on_submit():
         existing_user = Faculty.query.filter_by(username=form.username.data.strip()).first()
         if existing_user:
             flash('Username already exists', 'danger')
             return redirect(url_for('faculty'))
 
-        # find or create office by name
         office_name = form.office.data.strip()
-        office = Office.query.filter_by(Office_nm=office_name).first()
+        office = Office.query.filter_by(office_nm=office_name).first()
+
         if not office:
-            office = Office(Office_nm=office_name, office_loc='')
+            office = Office(office_nm=office_name, office_loc='')
             db.session.add(office)
             db.session.commit()
 
         new_faculty = Faculty(
-            Faculty_nm=form.name.data.strip(),
+            faculty_nm=form.name.data.strip(),
             username=form.username.data.strip(),
             password=generate_password_hash(form.password.data.strip()),
-            Office_id=office.Office_id
+            office_id=office.office_id
         )
+
         db.session.add(new_faculty)
         db.session.commit()
+
         flash('Faculty added.', 'success')
         return redirect(url_for('faculty'))
 
-    # handle optional search
     q = request.args.get('q', '').strip()
+
     if q:
-        faculties = Faculty.query.join(Office).filter(or_(Faculty.Faculty_nm.ilike(f"%{q}%"), Faculty.username.ilike(f"%{q}%"), Office.Office_nm.ilike(f"%{q}%"))).all()
+        faculties = Faculty.query.join(Office).filter(
+            or_(
+                Faculty.faculty_nm.ilike(f"%{q}%"),
+                Faculty.username.ilike(f"%{q}%"),
+                Office.office_nm.ilike(f"%{q}%")
+            )
+        ).all()
     else:
         faculties = Faculty.query.all()
 
     items = []
     for f in faculties:
         items.append({
-            'id': f.Faculty_id,
-            'name': f.Faculty_nm,
+            'id': f.faculty_id,
+            'name': f.faculty_nm,
             'username': f.username,
-            'office': f.office.Office_nm if getattr(f, 'office', None) else ''
+            'office': f.office.office_nm if f.office else ''
         })
 
     return render_template('manage-faculty.html', items=items, add_form=form, q=q)
 
-
-
 @app.route('/admin/faculty/edit/<int:faculty_id>', methods=['POST'])
 def edit_faculty(faculty_id):
     form = FacultyForm()
+
     if form.validate_on_submit():
         fac = Faculty.query.get_or_404(faculty_id)
-        fac.Faculty_nm = form.name.data.strip()
+
+        fac.faculty_nm = form.name.data.strip()
         fac.username = form.username.data.strip()
+
         if form.password.data and form.password.data.strip():
             fac.password = generate_password_hash(form.password.data.strip())
 
         office_name = form.office.data.strip()
-        office = Office.query.filter_by(Office_nm=office_name).first()
+        office = Office.query.filter_by(office_nm=office_name).first()
+
         if not office:
-            office = Office(Office_nm=office_name, office_loc='')
+            office = Office(office_nm=office_name, office_loc='')
             db.session.add(office)
             db.session.commit()
 
-        fac.Office_id = office.Office_id
+        fac.office_id = office.office_id
+
         db.session.commit()
+
         flash('Faculty updated.', 'success')
+
     else:
-        flash('Failed to update faculty. Check input.', 'danger')
+        flash('Failed to update faculty.', 'danger')
+
     return redirect(url_for('faculty'))
 
-
-
-
-@app.route('/admin/category', methods = ['GET', 'POST'])
+@app.route('/admin/category', methods=['GET', 'POST'])
 def category():
     form = CategoryForm()
     return render_template('manage-category.html')
 
-#################################################end of dashboard(admin) ####################################################
-
-
-############################################for student dashboard ####################################################
-
+#########################Student dashboard and borrowing routes#########################
 
 @app.route('/student/information', methods=['GET', 'POST'])
 def student_information():
+
+    if 'student' in session:
+        flash('Student information already provided.', 'info')
+        return redirect(url_for('student_dashboard'))
+
     form = StudentForm()
+
     if form.validate_on_submit():
-        new_student = Student(
-            Student_nm=form.name.data.strip(),
-            Student_number=form.student_id.data.strip(),
-            student_course=form.course.data.strip(),
-            student_year=form.year.data.strip()
-        )
-        db.session.add(new_student)
-        db.session.commit()
-        flash('Student added successfully.', 'success')
-        return redirect(url_for('student_information'))
+
+        student_number = form.id_number.data.strip()
+
+        student = Student.query.filter_by(
+            student_number=student_number
+        ).first()
+
+        if not student:
+            student = Student(
+                student_nm=form.name.data.strip(),
+                student_number=student_number,
+                student_course=form.course.data.strip(),
+                student_year=form.year.data.strip()
+            )
+
+            db.session.add(student)
+            db.session.commit()
+
+        session['student'] = {
+            'id': student.student_id,
+            'name': student.student_nm,
+            'number': student.student_number,
+            'course': student.student_course,
+            'year': student.student_year
+        }
+
+        flash('Student information saved.', 'success')
+
+        return redirect(url_for('student_dashboard'))
 
     return render_template('student-information.html', form=form)
 
 @app.route('/student/dashboard', methods=['GET', 'POST'])
 def student_dashboard():
-    # Get filters from query parameters
+
+    if 'student' not in session:
+        flash('Please enter your information first.', 'warning')
+        return redirect(url_for('student_information'))
+
+    student = session['student']
+
     search = request.args.get('search', '').strip()
     category_filter = request.args.get('category', 'all')
 
-    # Start query
     inventories = Inventory.query
 
-    # Apply category filter
     if category_filter != 'all':
-        inventories = inventories.join(Inventory.category).filter(Inventory.category.has(Category_nm=category_filter))
+        inventories = inventories.join(Category).filter(Category.category_nm == category_filter)
 
-    # Apply search filter
     if search:
         search_pattern = f"%{search}%"
-        inventories = inventories.filter(
+        inventories = inventories.join(Category).filter(
             or_(
-                Inventory.Inventory_nm.ilike(search_pattern),
-                Inventory.Serial_number.ilike(search_pattern),
-                Inventory.Inventory_condition.ilike(search_pattern),
-                Inventory.category.has(Category.Category_nm.ilike(search_pattern))
+                Inventory.inventory_nm.ilike(search_pattern),
+                Inventory.serial_number.ilike(search_pattern),
+                Inventory.inventory_condition.ilike(search_pattern),
+                Category.category_nm.ilike(search_pattern)
             )
         )
 
     inventories = inventories.all()
 
-    # Build items list
     items = []
-    for inventory in inventories:
-        approved_qty = db.session.query(func.coalesce(func.sum(BorrowTracker.borrow_quantity),0)).filter(
-            BorrowTracker.InventoryID == inventory.InventoryID,
-            BorrowTracker.status == 'approved'
-        ).scalar() or 0
-        
-        available = inventory.Quantity - approved_qty
 
+    for inventory in inventories:
         items.append({
-            'id': inventory.InventoryID,
-            'name': inventory.Inventory_nm,
-            'category': inventory.category.Category_nm if getattr(inventory, 'category', None) else '',
-            'desc': f"serial: {inventory.Serial_number}, condition: {inventory.Inventory_condition}",
-            'available': available > 0,
-            'quantity': available
+            'id': inventory.inventory_id,
+            'name': inventory.inventory_nm,
+            'category': inventory.category.category_nm if inventory.category else '',
+            'desc': f"serial: {inventory.serial_number}, condition: {inventory.inventory_condition}",
+            'available': inventory.is_available
         })
 
-    # Stats for hero section
     total_items = len(items)
     available_items = sum(1 for i in items if i['available'])
     categories = set(i['category'] for i in items)
@@ -443,59 +682,68 @@ def student_dashboard():
         available_items=available_items,
         categories=len(categories),
         current_category=category_filter,
-        search_query=search
+        search_query=search,
+        student=student
     )
-
 
 @app.route('/student/borrow', methods=['GET', 'POST'])
 def student_borrow():
+    if 'student' not in session:
+        return redirect(url_for('student_information'))
+
+    student = session['student']
     form = BorrowForm()
+    form.student_id.data = student['number']
 
-    inventory_id = request.args.get('inventory_id')
+    inventory_id = request.args.get('inventory_id') or form.inventory_id.data
+    inventory_item = Inventory.query.get(inventory_id) if inventory_id else None
 
-    inventory_item = None
-    if inventory_id:
-        inventory_item = Inventory.query.get(inventory_id)
-        if inventory_item:
-            form.inventory_id.data = inventory_item.InventoryID
+    if inventory_item:
+        form.inventory_id.data = inventory_item.inventory_id
 
     if form.validate_on_submit():
-
-        student = Student.query.filter_by(
-            Student_number=form.student_id.data.strip()
-        ).first()
-
-        if not student:
-            flash('Student not found.', 'danger')
-            return render_template('student-borrow.html',
-                                   form=form,
-                                   inventory=inventory_item)
-
         inventory_item = Inventory.query.get(form.inventory_id.data)
 
         if not inventory_item:
             flash('Inventory not found.', 'danger')
-            return render_template('student-borrow.html',
-                                   form=form,
-                                   inventory=None)
+            return render_template('student-borrow.html', form=form, inventory=None, student=student)
 
-        # Create request (PENDING)
+        if not inventory_item.is_available:
+            flash('Item is currently unavailable.', 'danger')
+            return redirect(url_for('student_dashboard'))
+
+        # --- Get approver from office (optional, but for future reference) ---
+        approver_id = None
+        if inventory_item.office.approver_config:
+            approver_id = inventory_item.office.approver_config.faculty_id
+
+        # --- Create borrow request ---
         borrow_record = BorrowTracker(
-            borrow_quantity=form.quantity.data,
-            Student_id=student.Student_id,
-            InventoryID=inventory_item.InventoryID,
-            status='pending'
+            student_id=student['id'],
+            inventory_id=inventory_item.inventory_id,
+            status='pending',
+            remarks=form.remarks.data.strip() if form.remarks.data else None,
+            approved_by=approver_id  # can be None for now
         )
 
         db.session.add(borrow_record)
         db.session.commit()
 
-        flash('Borrow request submitted! Waiting for approval.', 'success')
+        flash('Borrow request submitted. Waiting for approval.', 'success')
         return redirect(url_for('student_dashboard'))
 
-    return render_template('student-borrow.html',
-                           form=form,
-                           inventory=inventory_item)
+    return render_template(
+        'student-borrow.html',
+        form=form,
+        inventory=inventory_item,
+        student=student
+    )
+
+@app.route('/student/logout')
+def student_logout():
+    session.pop('student', None)
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('student_information'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)

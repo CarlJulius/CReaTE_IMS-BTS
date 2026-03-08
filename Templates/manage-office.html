@@ -72,25 +72,37 @@
                         <th>Office ID</th>
                         <th>Office Name</th>
                         <th>Location</th>
+                        <th>Faculty in Charge</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for it in items %}
+                    {% for it in offices %}
                     <tr>
-                        <td>{{ it.id }}</td>
-                        <td>{{ it.name }}</td>
-                        <td>{{ it.location }}</td>
+                        <td>{{ it.office_id }}</td>
+                        <td>{{ it.office_nm }}</td>
+                        <td>{{ it.office_loc }}</td>
+                        <td>
+                            {% if it.approver_config %}
+                                {{ it.approver_config.faculty.faculty_nm }}
+                            {% else %}
+                                <em>Unassigned</em>
+                            {% endif %}
+                        </td>
                         <td>
                             <button class="icon-btn edit-btn" 
-                                data-id="{{ it.id }}"
-                                data-name="{{ it.name }}"
-                                data-location="{{ it.location }}"
+                                data-id="{{ it.office_id }}"
+                                data-name="{{ it.office_nm }}"
+                                data-location="{{ it.office_loc }}"
                             ><i class="fa-solid fa-pen-to-square"></i></button>
-                            <form method="post" action="{{ url_for('delete_office', office_id=it.id) }}" style="display:inline;">
+                            <form method="post" action="{{ url_for('delete_office', office_id=it.office_id) }}" style="display:inline;">
                                 {{ add_form.csrf_token }}
                                 <button class="icon-btn delete-btn" type="submit"><i class="fa-solid fa-trash"></i></button>
                             </form>
+                            <button class="icon-btn assign-btn"
+                                data-id="{{ it.office_id }}"
+                                data-name="{{ it.office_nm }}"
+                            >Assign in Charge</button>
                         </td>
                     </tr>
                     {% else %}
@@ -123,6 +135,27 @@
                 </form>
             </div>
         </div>
+         <!-- Assign Approver Modal -->
+        <div id="assignModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <span id="closeAssignModal" class="modal-close">&times;</span>
+                <h3>Assign in Charge</h3>
+                <form id="assignForm" method="post" action="">
+                    {{ add_form.csrf_token }}
+                    <div class="form-row">
+                        <label for="faculty_id">Select Faculty</label>
+                        <select id="faculty_id" name="faculty_id" class="input-field">
+                            {% for f in faculty_list %}
+                                <option value="{{ f.faculty_id }}">{{ f.faculty_nm }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <button class="action-btn" type="submit">Assign</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <script>
             document.addEventListener('DOMContentLoaded', function(){
@@ -143,6 +176,23 @@
                 });
                 if(closeEdit) closeEdit.addEventListener('click', ()=> editModal.style.display='none');
                 window.addEventListener('click', (e)=>{ if(e.target === editModal) editModal.style.display='none'; });
+            });
+            document.addEventListener('DOMContentLoaded', function(){
+                const assignModal = document.getElementById('assignModal');
+                const closeAssign = document.getElementById('closeAssignModal');
+                const assignForm = document.getElementById('assignForm');
+
+                document.querySelectorAll('.assign-btn').forEach(btn=>{
+                    btn.addEventListener('click', (e)=>{
+                        e.preventDefault();
+                        const id = btn.dataset.id;
+                        assignForm.action = `/admin/office/assign/${id}`;
+                        if(assignModal.parentNode !== document.body){ document.body.appendChild(assignModal); }
+                        assignModal.style.display='flex';
+                    });
+                });
+                if(closeAssign) closeAssign.addEventListener('click', ()=> assignModal.style.display='none');
+                window.addEventListener('click', (e)=>{ if(e.target === assignModal) assignModal.style.display='none'; });
             });
         </script>
 

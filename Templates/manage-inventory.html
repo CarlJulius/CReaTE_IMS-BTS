@@ -1,200 +1,166 @@
 {% extends "base.html" %}
 
 {% block content %}
-<body>
-    <main class="main-content">
-        
-        <div class="page-header">
-            <h2>Inventory List</h2>
-            <button id="openAddModal" class="action-btn add-btn"><i class="fa-solid fa-plus"></i> Add New Item</button>
-        </div>
+<main class="main-content">
+    <div class="page-header">
+        <h2>Inventory List</h2>
+        <button id="openModalBtn" class="action-btn add-btn">
+            <i class="fa-solid fa-plus"></i> Add New Item
+        </button>
+    </div>
 
-        <!-- Add Item Modal -->
-        <div id="addModal" class="modal" style="display:none;">
-            <div class="modal-content">
-                <span id="closeAddModal" class="modal-close">&times;</span>
-                <h3>Add Inventory Item</h3>
-                <form method="post" action="{{ url_for('inventory') }}">
-                    {{ add_form.hidden_tag() }}
-                    <div class="form-row">
-                        {{ add_form.name.label }}
-                        {{ add_form.name(class="input-field") }}
-                    </div>
-                    <div class="form-row">
-                        {{ add_form.quantity.label }}
-                        {{ add_form.quantity(class="input-field") }}
-                    </div>
-                    <div class="form-row">
-                        {{ add_form.condition.label }}
-                        {{ add_form.condition(class="input-field") }}
-                    </div>
-                    <div class="form-row">
-                        {{ add_form.serial.label }}
-                        {{ add_form.serial(class="input-field") }}
-                    </div>
-                    <div class="form-row">
-                        {{ add_form.category.label }}
-                        {{ add_form.category(class="input-field") }}
-                    </div>
-                    <div class="form-row">
-                        {{ add_form.submit(class="action-btn") }}
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <style>
-            .modal{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999}
-            .modal-content{background:#fff;padding:20px;border-radius:6px;max-width:480px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:100000}
-            .modal-close{float:right;font-size:22px;cursor:pointer}
-            .form-row{margin-bottom:10px}
-            .input-field{width:100%;padding:8px;color:#000;background:#fff;border:1px solid #ccc;border-radius:4px}
-            .modal label{display:block;margin-bottom:6px;color:#111;font-weight:600}
-            .table-container{position:relative;z-index:1}
-        </style>
-
-        <script>
-            document.addEventListener('DOMContentLoaded', function(){
-                const openBtn = document.getElementById('openAddModal');
-                const modal = document.getElementById('addModal');
-                const closeBtn = document.getElementById('closeAddModal');
-                // ensure modal is appended to body so it overlays everything
-                if(modal && modal.parentNode !== document.body){
-                    document.body.appendChild(modal);
-                }
-                if(openBtn){ openBtn.addEventListener('click', (e)=>{ e.preventDefault(); modal.style.display='flex'; }); }
-                if(closeBtn){ closeBtn.addEventListener('click', ()=> modal.style.display='none'); }
-                window.addEventListener('click', (e)=>{ if(e.target === modal) modal.style.display='none'; });
-            });
-        </script>
-
-        <div class="controls-container">
-            <form method="get" action="{{ url_for('inventory') }}" style="display:flex;gap:8px;align-items:center;">
-                <div class="search-box">
-                    <input name="q" type="text" placeholder="Search" value="{{ q }}">
+    <!-- Reusable Modal -->
+    <div id="itemModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span id="closeModal" class="modal-close">&times;</span>
+            <h3 id="modalTitle">Add Inventory Item</h3>
+            <form id="itemForm" method="post" action="{{ url_for('inventory') }}">
+                {{ add_form.hidden_tag() }}
+                <div class="form-row">
+                    {{ add_form.name.label }}
+                    <input id="item-name" name="name" class="input-field" />
                 </div>
-                <button class="action-btn" type="submit">Search</button>
+                <div class="form-row">
+                    {{ add_form.desc.label }}
+                    <input id="item-desc" name="desc" class="input-field" />
+                </div>
+                <div class="form-row">
+                    {{ add_form.condition.label }}
+                    <select id="item-condition" name="condition" class="input-field">
+                        <option value="functional">Functional</option>
+                        <option value="non-functional">Non Functional</option>
+                        <option value="under repair">Under Repair</option>
+                        <option value="under-maintenance">Under Maintenance</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    {{ add_form.serial.label }}
+                    <input id="item-serial" name="serial" class="input-field" />
+                </div>
+                <div class="form-row">
+                    {{ add_form.category.label }}
+                    <input id="item-category" name="category" class="input-field" />
+                </div>
+                <div class="form-row">
+                    {{ add_form.office.label }}
+                    <select id="item-office" name="office" class="input-field">
+                        {% for o in office_list %}
+                        <option value="{{ o.office_id }}">{{ o.office_nm }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <button id="itemSubmit" class="action-btn" type="submit">Save</button>
+                </div>
             </form>
-           
         </div>
+    </div>
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Item ID</th>
-                        <th>Item Name</th>
-                        <th>Category</th>
-                        <th>Total Stock</th>
-                        <th>Available</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for it in items %}
-                    <tr>
-                        <td>{{ it.id }}</td>
-                        <td>{{ it.name }}</td>
-                        <td>{{ it.category }}</td>
-                        <td>{{ it.total }}</td>
-                        <td>{{ it.available }}</td>
-                        <td>
-                            {% if it.available > 0 %}
-                                <span class="badge in-stock">In Stock</span>
-                            {% else %}
-                                <span class="badge out-of-stock">Out of Stock</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <button class="icon-btn edit-btn" 
-                                data-id="{{ it.id }}"
-                                data-name="{{ it.name }}"
-                                data-quantity="{{ it.total }}"
-                                data-condition="{{ it.condition }}"
-                                data-serial="{{ it.serial }}"
-                                data-category="{{ it.category }}"
-                            ><i class="fa-solid fa-pen-to-square"></i></button>
-                            <form method="post" action="{{ url_for('delete_inventory', item_id=it.id) }}" style="display:inline;">
-                                {{ add_form.csrf_token }}
-                                <button class="icon-btn delete-btn" type="submit"><i class="fa-solid fa-trash"></i></button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="7">No inventory items found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <!-- Table -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Item ID</th>
+                    <th>Item Name</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Available</th>
+                    <th>Status</th>
+                    <th>Office</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in items %}
+                <tr>
+                    <td>{{ it.id }}</td>
+                    <td>{{ it.name }}</td>
+                    <td>{{ it.desc }}</td>
+                    <td>{{ it.category }}</td>
+                    <td>{{ 'Yes' if it.available else 'No' }}</td>
+                    <td>{{ it.condition }}</td>
+                    <td>{{ it.office }}</td>
+                    <td>
+                        <button class="icon-btn edit-btn" 
+                            data-id="{{ it.id }}"
+                            data-name="{{ it.name }}"
+                            data-desc="{{ it.desc }}"
+                            data-condition="{{ it.condition }}"
+                            data-serial="{{ it.serial }}"
+                            data-category="{{ it.category }}"
+                            data-office="{{ it.office }}"
+                        ><i class="fa-solid fa-pen-to-square"></i></button>
+                        <form method="post" action="{{ url_for('delete_inventory', item_id=it.id) }}" style="display:inline;">
+                            {{ add_form.csrf_token }}
+                            <button class="icon-btn delete-btn" type="submit"><i class="fa-solid fa-trash"></i></button>
+                        </form>
+                    </td>
+               
+                {% else %}
+                <tr>
+                    <td colspan="8">No inventory items found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-        <!-- Edit Item Modal -->
-        <div id="editModal" class="modal" style="display:none;">
-            <div class="modal-content">
-                <span id="closeEditModal" class="modal-close">&times;</span>
-                <h3>Edit Inventory Item</h3>
-                <form id="editForm" method="post" action="">
-                    {{ add_form.hidden_tag() }}
-                    <div class="form-row">
-                        <label for="edit-name">Item Name</label>
-                        <input id="edit-name" name="name" class="input-field" />
-                    </div>
-                    <div class="form-row">
-                        <label for="edit-quantity">Quantity</label>
-                        <input id="edit-quantity" name="quantity" type="number" class="input-field" />
-                    </div>
-                    <div class="form-row">
-                        <label for="edit-condition">Condition</label>
-                        <select id="edit-condition" name="condition" class="input-field">
-                            <option value="functional">Functional</option>
-                            <option value="non functional">Non Functional</option>
-                            <option value="under repair">Under Repair</option>
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <label for="edit-serial">Serial Number</label>
-                        <input id="edit-serial" name="serial" class="input-field" />
-                    </div>
-                    <div class="form-row">
-                        <label for="edit-category">Category</label>
-                        <input id="edit-category" name="category" class="input-field" />
-                    </div>
-                    <div class="form-row">
-                        <button class="action-btn" type="submit">Save Changes</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+    <!-- Styles -->
+    <style>
+        .modal { position: fixed; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:99999; }
+        .modal-content { background:#fff; padding:20px; border-radius:6px; max-width:480px; width:100%; box-shadow:0 8px 24px rgba(0,0,0,0.2); z-index:100000; }
+        .modal-close { float:right; font-size:22px; cursor:pointer; }
+        .form-row { margin-bottom:10px; }
+        .input-field { width:100%; padding:8px; color:#000; background:#fff; border:1px solid #ccc; border-radius:4px; }
+        .modal label { display:block; margin-bottom:6px; font-weight:600; color:#111; }
+        .table-container { position:relative; z-index:1; }
+    </style>
 
-        <script>
-            document.addEventListener('DOMContentLoaded', function(){
-                // edit modal handlers
-                const editModal = document.getElementById('editModal');
-                const closeEdit = document.getElementById('closeEditModal');
-                const editForm = document.getElementById('editForm');
+    <!-- JS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('itemModal');
+            const openBtn = document.getElementById('openModalBtn');
+            const closeBtn = document.getElementById('closeModal');
+            const form = document.getElementById('itemForm');
+            const modalTitle = document.getElementById('modalTitle');
+            const submitBtn = document.getElementById('itemSubmit');
 
-                document.querySelectorAll('.edit-btn').forEach(btn=>{
-                    btn.addEventListener('click', (e)=>{
-                        e.preventDefault();
-                        const id = btn.dataset.id;
-                        document.getElementById('edit-name').value = btn.dataset.name || '';
-                        document.getElementById('edit-quantity').value = btn.dataset.quantity || '';
-                        document.getElementById('edit-condition').value = btn.dataset.condition || 'functional';
-                        document.getElementById('edit-serial').value = btn.dataset.serial || '';
-                        document.getElementById('edit-category').value = btn.dataset.category || '';
-                        editForm.action = `/admin/inventory/edit/${id}`;
-                        if(editModal.parentNode !== document.body){ document.body.appendChild(editModal); }
-                        editModal.style.display='flex';
-                    });
-                });
-                if(closeEdit) closeEdit.addEventListener('click', ()=> editModal.style.display='none');
-                window.addEventListener('click', (e)=>{ if(e.target === editModal) editModal.style.display='none'; });
+            // Add Item
+            openBtn.addEventListener('click', e => {
+                e.preventDefault();
+                modalTitle.textContent = 'Add Inventory Item';
+                submitBtn.textContent = 'Add';
+                form.action = '{{ url_for("inventory") }}';
+                form.reset();
+                modal.style.display = 'flex';
             });
-        </script>
 
-    </main>
+            // Edit Item
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.preventDefault();
+                    const id = btn.dataset.id;
+                    modalTitle.textContent = 'Edit Inventory Item';
+                    submitBtn.textContent = 'Save Changes';
+                    form.action = `/admin/inventory/edit/${id}`;
 
-</body>
+                    document.getElementById('item-name').value = btn.dataset.name || '';
+                    document.getElementById('item-desc').value = btn.dataset.desc || '';
+                    document.getElementById('item-condition').value = btn.dataset.condition || 'functional';
+                    document.getElementById('item-serial').value = btn.dataset.serial || '';
+                    document.getElementById('item-category').value = btn.dataset.category || '';
+                    document.getElementById('item-office').value = btn.dataset.office || '';
+
+                    modal.style.display = 'flex';
+                });
+            });
+
+            // Close Modal
+            closeBtn.addEventListener('click', ()=> modal.style.display='none');
+            window.addEventListener('click', e => { if(e.target === modal) modal.style.display='none'; });
+        });
+    </script>
+</main>
 {% endblock %}

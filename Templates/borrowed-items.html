@@ -11,16 +11,13 @@
         </div>
 
         <div class="controls-container">
-            <div class="search-box">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" placeholder="Search by student name, ID, or item...">
-            </div>
-            <select class="filter-dropdown">
-                <option value="all">All Statuses</option>
-                <option value="active">Currently Borrowed</option>
-                <option value="overdue">Overdue</option>
-                <option value="returned">Returned</option>
-            </select>
+            <form method="get" action="{{ url_for('borrowed_items') }}" style="display:flex; gap: 0.5rem;">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" name="q" placeholder="Search by student name, ID, or item..." value="{{ q|default('') }}">
+                </div>
+                <button type="submit">Search</button>
+            </form>
         </div>
 
         <div class="table-container">
@@ -31,68 +28,57 @@
                         <th>Student Details</th>
                         <th>Item Details</th>
                         <th>Borrow Date</th>
-                        <th>Due Date</th>
+                        <th>Return Date</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
+                    {% for item in items %}
                     <tr>
-                        <td>BRW-201</td>
+                        <td>BRW-{{ item.borrow_id }}</td>
                         <td>
-                            <strong>John Smith</strong><br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU001</span>
+                            <strong>{{ item.student.student_nm }}</strong><br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">{{ item.student.student_number }}</span>
                         </td>
-                        <td>MacBook Pro 16"<br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">ITM-001</span>
-                        </td>
-                        <td>2026-03-01</td>
-                        <td>2026-03-05</td>
-                        <td><span class="badge active-borrow">Borrowed</span></td>
                         <td>
-                            <button class="action-btn return-btn"><i class="fa-solid fa-check"></i> Mark Returned</button>
+                            {{ item.inventory.inventory_nm }}<br>
+                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">{{ item.inventory.serial_number }}</span>
                         </td>
-                    </tr>
-                    
-                    <tr>
-                        <td>BRW-202</td>
+                        <td>{{ item.borrow_date.strftime('%Y-%m-%d') if item.borrow_date else 'N/A' }}</td>
+                        <td>{{ item.return_date.strftime('%Y-%m-%d') if item.return_date else 'N/A' }}</td>
                         <td>
-                            <strong>Emily Davis</strong><br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU004</span>
+                            {% if item.status == 'approved' %}
+                                <span class="badge approved">Approved</span>
+                            {% elif item.status == 'borrowed' %}
+                                <span class="badge active-borrow">Borrowed</span>
+                            {% elif item.status == 'overdue' %}
+                                <span class="badge overdue">Overdue</span>
+                            {% elif item.status == 'returned' %}
+                                <span class="badge returned">Returned</span>
+                            {% endif %}
                         </td>
-                        <td>Projector<br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">ITM-002</span>
-                        </td>
-                        <td>2026-02-25</td>
-                        <td>2026-02-28</td>
-                        <td><span class="badge overdue">Overdue</span></td>
                         <td>
-                            <button class="action-btn return-btn"><i class="fa-solid fa-check"></i> Mark Returned</button>
-                            <button class="icon-btn remind-btn" title="Send Reminder"><i class="fa-solid fa-bell"></i></button>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td>BRW-199</td>
-                        <td>
-                            <strong>Mike Brown</strong><br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU003</span>
-                        </td>
-                        <td>Lab Beakers Set<br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">ITM-003</span>
-                        </td>
-                        <td>2026-02-20</td>
-                        <td>2026-02-22</td>
-                        <td><span class="badge returned">Returned</span></td>
-                        <td>
+                            {% if item.status in ['approved', 'borrowed', 'overdue'] %}
+                            <form method="post" action="{{ url_for('mark_returned', borrow_id=item.borrow_id) }}" style="display:inline;">
+                                <button class="action-btn return-btn">
+                                    <i class="fa-solid fa-check"></i> Mark Returned
+                                </button>
+                            </form>
+                            {% else %}
                             <button class="action-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;">View Record</button>
+                            {% endif %}
                         </td>
                     </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7">No borrowed items found.</td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
 
     </main>
-
 </body>
 {% endblock %}

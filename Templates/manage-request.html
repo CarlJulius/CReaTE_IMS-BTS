@@ -1,91 +1,143 @@
 {% extends "base.html" %}
 
 {% block content %}
-<body>
+<main class="main-content">
 
-    <main class="main-content">
-        
-        <div class="page-header">
-            <h2>Borrow Requests</h2>
-        </div>
+    <div class="page-header">
+        <h2>Borrow Requests</h2>
+    </div>
 
-        <div class="controls-container">
+    <!-- Search Form -->
+    <div class="controls-container">
+        <form method="get" action="{{ url_for('requests') }}" style="display:flex;gap:8px;align-items:center;">
             <div class="search-box">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" placeholder="Search by student name or ID...">
+                <input type="text" name="q" placeholder="Search by student name or ID..." value="{{ q|default('') }}">
+                <button class="action-btn" type="submit">Search</button>
             </div>
-            <select class="filter-dropdown">
-                <option value="all">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-            </select>
+        </form>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Req ID</th>
+                    <th>Student Details</th>
+                    <th>Requested Item</th>
+                    <th>Request Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                <tr>
+                    <td>REQ-{{ req.borrow_id }}</td>
+                    <td>
+                        <strong>{{ req.student.student_nm }}</strong><br>
+                        <span style="font-size: 12px; color: rgba(0,0,0,0.6);">{{ req.student.student_number }}</span>
+                    </td>
+                    <td>{{ req.inventory.inventory_nm }}</td>
+                    <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        {% if req.status == 'pending' %}
+                            <span class="badge pending">Pending</span>
+                        {% elif req.status == 'approved' %}
+                            <span class="badge approved">Approved</span>
+                        {% elif req.status == 'rejected' %}
+                            <span class="badge rejected">Rejected</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if req.status == 'pending' %}
+                        <button class="action-btn approve" onclick="openModal('approve', {{ req.borrow_id }})">Approve</button>
+                        <button class="action-btn reject" onclick="openModal('reject', {{ req.borrow_id }})">Reject</button>
+                        {% else %}
+                        <button class="action-btn" disabled>Processed</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">No pending requests found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal -->
+    <div id="remarkModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#1a2e1a; padding:2rem; border-radius:12px; width:400px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);">
+            <h3 id="modalTitle" style="margin-bottom:1rem; color:white;">Add Remark</h3>
+            <form id="remarkForm" method="post">
+
+                <!-- Borrow Date (shown on Approve) -->
+                <div id="borrowDateField" style="display:none; margin-bottom:1rem;">
+                    <label style="color:white; font-size:14px; display:block; margin-bottom:4px;">Borrow Date</label>
+                    <input type="date" name="borrow_date"
+                        style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white;">
+                </div>
+
+                <!-- Return Date (shown on Approve) -->
+                <div id="returnDateField" style="display:none; margin-bottom:1rem;">
+                    <label style="color:white; font-size:14px; display:block; margin-bottom:4px;">Expected Return Date</label>
+                    <input type="date" name="return_date"
+                        style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white;">
+                </div>
+
+                <textarea name="remarks" placeholder="Enter remark (optional)..." 
+                    style="width:100%; height:100px; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white; resize:none; margin-bottom:1rem;"></textarea>
+
+                <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                    <button type="button" onclick="closeModal()" 
+                        style="padding:0.5rem 1rem; border-radius:20px; border:1px solid rgba(255,255,255,0.3); background:transparent; color:white; cursor:pointer;">
+                        Cancel
+                    </button>
+                    <button type="submit" id="modalSubmitBtn" 
+                        style="padding:0.5rem 1rem; border-radius:20px; border:none; cursor:pointer;">
+                        Confirm
+                    </button>
+                </div>
+            </form>
         </div>
+    </div>
+<script>
+    function openModal(action, borrowId) {
+    const modal = document.getElementById('remarkModal');
+    const title = document.getElementById('modalTitle');
+    const submitBtn = document.getElementById('modalSubmitBtn');
+    const form = document.getElementById('remarkForm');
+    const borrowDateField = document.getElementById('borrowDateField');
+    const returnDateField = document.getElementById('returnDateField');
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Req ID</th>
-                        <th>Student Details</th>
-                        <th>Requested Item</th>
-                        <th>Borrow Date</th>
-                        <th>Return Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>REQ-101</td>
-                        <td>
-                            <strong>John Smith</strong><br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU001</span>
-                        </td>
-                        <td>MacBook Pro 16"</td>
-                        <td>2026-03-05</td>
-                        <td>2026-03-07</td>
-                        <td><span class="badge pending">Pending</span></td>
-                        <td>
-                            <button class="action-btn approve">Approve</button>
-                            <button class="action-btn reject">Reject</button>
-                        </td>
-                    </tr>
-                    
-                    <tr>
-                        <td>REQ-102</td>
-                        <td>
-                            <strong>Sarah Johnson</strong><br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU002</span>
-                        </td>
-                        <td>Projector</td>
-                        <td>2026-03-04</td>
-                        <td>2026-03-04</td>
-                        <td><span class="badge approved">Approved</span></td>
-                        <td>
-                            <button class="action-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;">View Details</button>
-                        </td>
-                    </tr>
+    if (action === 'approve') {
+        title.textContent = 'Approve Request';
+        submitBtn.style.background = '#22c55e';
+        submitBtn.style.color = '#0f1f0f';
+        submitBtn.style.fontWeight = 'bold';
+        form.action = `/admin/requests/approve/${borrowId}`;
+        borrowDateField.style.display = 'block';
+        returnDateField.style.display = 'block';
+    } else {
+        title.textContent = 'Reject Request';
+        submitBtn.style.background = '#c0392b';
+        submitBtn.style.color = 'white';
+        submitBtn.style.fontWeight = 'bold';
+        form.action = `/admin/requests/reject/${borrowId}`;
+        borrowDateField.style.display = 'none';
+        returnDateField.style.display = 'none';
+    }
 
-                    <tr>
-                        <td>REQ-103</td>
-                        <td>
-                            <strong>Mike Brown</strong><br>
-                            <span style="font-size: 12px; color: rgba(255,255,255,0.6);">STU003</span>
-                        </td>
-                        <td>Lab Beakers Set</td>
-                        <td>2026-03-06</td>
-                        <td>2026-03-10</td>
-                        <td><span class="badge rejected">Rejected</span></td>
-                        <td>
-                            <button class="action-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;">View Details</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+    modal.style.display = 'flex';
+}
+function closeModal() {
+    document.getElementById('remarkModal').style.display = 'none';
+    document.getElementById('remarkForm').reset();
+    document.getElementById('borrowDateField').style.display = 'none';
+    document.getElementById('returnDateField').style.display = 'none';
+}
+</script>
 
-    </main>
-
-</body>
+</main>
 {% endblock %}

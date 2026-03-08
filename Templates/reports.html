@@ -2,47 +2,48 @@
 
 {% block content %}
 <body>
-
-    
-
     <main class="main-content">
         
         <div class="page-header">
             <h2>System Reports</h2>
-            <button class="action-btn export-btn"><i class="fa-solid fa-download"></i> Export to CSV</button>
+            <a href="{{ url_for('export_csv') }}">
+                <button class="action-btn export-btn"><i class="fa-solid fa-download"></i> Export to CSV</button>
+            </a>
         </div>
 
         <div class="controls-container date-filters">
-            <div class="search-box">
-                <span style="padding-left: 15px; color: rgba(255,255,255,0.7);">From:</span>
-                <input type="date" style="padding-left: 10px;">
-            </div>
-            <div class="search-box">
-                <span style="padding-left: 15px; color: rgba(255,255,255,0.7);">To:</span>
-                <input type="date" style="padding-left: 10px;">
-            </div>
-            <button class="action-btn generate-btn">Generate Report</button>
+            <form method="get" action="{{ url_for('reports') }}" style="display:flex; gap:0.5rem; align-items:center;">
+                <div class="search-box">
+                    <span style="padding-left: 15px; color: rgba(255,255,255,0.7);">From:</span>
+                    <input type="date" name="date_from" value="{{ date_from }}" style="padding-left: 10px;">
+                </div>
+                <div class="search-box">
+                    <span style="padding-left: 15px; color: rgba(255,255,255,0.7);">To:</span>
+                    <input type="date" name="date_to" value="{{ date_to }}" style="padding-left: 10px;">
+                </div>
+                <button class="action-btn generate-btn" type="submit">Generate Report</button>
+            </form>
         </div>
 
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-info">
                     <p>Total Borrows</p>
-                    <h3>128</h3>
+                    <h3>{{ total_borrows }}</h3>
                 </div>
                 <i class="fa-solid fa-handshake"></i>
             </div>
             <div class="stat-card">
                 <div class="stat-info">
                     <p>Most Borrowed</p>
-                    <h3 style="font-size: 20px; margin-top: 8px;">MacBook Pro 16"</h3>
+                    <h3 style="font-size: 20px; margin-top: 8px;">{{ most_borrowed }}</h3>
                 </div>
                 <i class="fa-solid fa-star"></i>
             </div>
             <div class="stat-card">
                 <div class="stat-info">
                     <p>Damage/Lost Reports</p>
-                    <h3 style="color: #f87171;">2</h3>
+                    <h3 style="color: #f87171;">{{ damage_reports }}</h3>
                 </div>
                 <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
@@ -51,38 +52,15 @@
         <div class="chart-container">
             <h3>Borrowing Activity (Past 7 Days)</h3>
             <div class="css-chart">
+                {% for d in daily_counts %}
                 <div class="bar-group">
-                    <div class="bar" style="height: 40%;"></div>
-                    <span>Mon</span>
+                    <div class="bar" style="height: {{ d.height }}%;"></div>
+                    <span>{{ d.day }}</span>
                 </div>
-                <div class="bar-group">
-                    <div class="bar" style="height: 60%;"></div>
-                    <span>Tue</span>
-                </div>
-                <div class="bar-group">
-                    <div class="bar" style="height: 90%;"></div>
-                    <span>Wed</span>
-                </div>
-                <div class="bar-group">
-                    <div class="bar" style="height: 30%;"></div>
-                    <span>Thu</span>
-                </div>
-                <div class="bar-group">
-                    <div class="bar" style="height: 75%;"></div>
-                    <span>Fri</span>
-                </div>
-                <div class="bar-group">
-                    <div class="bar" style="height: 20%;"></div>
-                    <span>Sat</span>
-                </div>
-                <div class="bar-group">
-                    <div class="bar" style="height: 10%;"></div>
-                    <span>Sun</span>
-                </div>
+                {% endfor %}
             </div>
         </div>
 
     </main>
-
 </body>
 {% endblock %}

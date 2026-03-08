@@ -3,85 +3,226 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>CReATe — Borrow Request</title>
+
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
 <style>
-  body { background: #f8f9fa; font-family: 'Sora', sans-serif; margin:0; padding:0; }
-  .container { max-width: 700px; margin: 2rem auto; padding: 1rem; }
-  .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
-  .card h1 { margin-top: 0; }
-  .form-group { margin-bottom: 1rem; display:flex; flex-direction:column; }
-  .form-group label { font-weight:500; margin-bottom:0.25rem; }
-  input, select, textarea { padding:0.5rem; border-radius:6px; border:1px solid #ccc; font-size:0.95rem; }
-  textarea { resize: vertical; }
-  .submit-btn { background:#045c34; color:#fff; border:none; padding:0.75rem 1.5rem; border-radius:6px; cursor:pointer; font-weight:600; }
-  .flash { padding:1rem; border-radius:8px; margin-bottom:1rem; }
-  .flash-success { background:#d4f0e4; color:#045c34; }
-  .flash-danger { background:#f8d7da; color:#842029; }
-  .item-chip { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; padding:0.75rem 1rem; background:#f1f3f5; border-radius:8px; }
-  .item-chip-icon { font-size:1.5rem; }
+
+body{
+    background:#f8f9fa;
+    font-family:'Sora', sans-serif;
+    margin:0;
+}
+
+.container{
+    max-width:720px;
+    margin:2rem auto;
+    padding:1rem;
+}
+
+.card{
+    background:#fff;
+    padding:2rem;
+    border-radius:14px;
+    box-shadow:0 10px 24px rgba(0,0,0,0.08);
+}
+
+.card h1{
+    margin-top:0;
+}
+
+.form-group{
+    margin-bottom:1rem;
+    display:flex;
+    flex-direction:column;
+}
+
+.form-group label{
+    font-weight:500;
+    margin-bottom:0.25rem;
+}
+
+input, textarea, select{
+    padding:0.55rem;
+    border-radius:6px;
+    border:1px solid #dcdcdc;
+    font-size:0.95rem;
+    background:#fff;
+}
+
+textarea{
+    resize:vertical;
+}
+
+.submit-btn{
+    background:#045c34;
+    color:#fff;
+    border:none;
+    padding:0.75rem 1.5rem;
+    border-radius:6px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.submit-btn:hover{
+    background:#03492a;
+}
+
+.flash{
+    padding:0.9rem;
+    border-radius:8px;
+    margin-bottom:1rem;
+}
+
+.flash-success{
+    background:#d4f0e4;
+    color:#045c34;
+}
+
+.flash-danger{
+    background:#f8d7da;
+    color:#842029;
+}
+
+.item-chip{
+    display:flex;
+    align-items:center;
+    gap:1rem;
+    margin-bottom:1.2rem;
+    padding:0.9rem 1rem;
+    background:#f1f3f5;
+    border-radius:8px;
+}
+
+.item-chip-icon{
+    font-size:1.6rem;
+}
+
+.student-box{
+    background:#f8f9fa;
+    border-radius:8px;
+    padding:0.9rem 1rem;
+    margin-bottom:1.2rem;
+}
+
+.info-line{
+    font-size:0.9rem;
+    color:#555;
+}
+
 </style>
 </head>
+
+
 <body>
 
 <div class="container">
 
-  <!-- Flash Messages -->
-  {% with messages = get_flashed_messages(with_categories=true) %}
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-      {% for category, message in messages %}
-        <div class="flash flash-{{ category }}">{{ message }}</div>
-      {% endfor %}
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+            {{ message }}
+        </div>
+        {% endfor %}
     {% endif %}
-  {% endwith %}
+{% endwith %}
 
-  <div class="card">
-    <h1>Borrow Request</h1>
-    <p>Submit a request to borrow this item. Approval will be sent to your school email.</p>
+<div class="card">
 
-    {% if inventory %}
-    <div class="item-chip">
-      <div class="item-chip-icon">💻</div>
-      <div>
-        <div><strong>{{ inventory.Inventory_nm }}</strong></div>
-        <div>{{ 'Available' if inventory.Quantity > 0 else 'Unavailable' }}</div>
-      </div>
-    </div>
-    {% endif %}
+<h1>Borrow Request</h1>
 
-    <form method="POST">
-      {{ form.hidden_tag() }}
-      
-      <div class="form-group">
-        {{ form.student_id.label }}
-        {{ form.student_id(class="form-control", placeholder="213-01234") }}
-        {% if form.student_id.errors %}
-          <small style="color:red;">{{ form.student_id.errors[0] }}</small>
-        {% endif %}
-      </div>
+<p style="color:#666;font-size:0.9rem;">
+Submit a request to borrow this item.  
+Your request will be reviewed by the equipment approver assigned to the item's office.
+</p>
 
-      <div class="form-group">
-        {{ form.quantity.label }}
-        {{ form.quantity(class="form-control", placeholder="1") }}
-        {% if form.quantity.errors %}
-          <small style="color:red;">{{ form.quantity.errors[0] }}</small>
-        {% endif %}
-      </div>
 
-      <div class="form-group">
-        {{ form.remarks.label }}
-        {{ form.remarks(class="form-control", placeholder="Optional notes") }}
-        {% if form.remarks.errors %}
-          <small style="color:red;">{{ form.remarks.errors[0] }}</small>
-        {% endif %}
-      </div>
+<!-- INVENTORY ITEM -->
+{% if inventory %}
+<div class="item-chip">
 
-      {{ form.inventory_id }}
+<div class="item-chip-icon">📦</div>
 
-      <button type="submit" class="submit-btn">{{ form.submit.label.text }}</button>
-    </form>
-  </div>
+<div>
+<div><strong>{{ inventory.inventory_nm }}</strong></div>
+
+<div class="info-line">
+Serial: {{ inventory.serial_number }}
+</div>
+
+<div class="info-line">
+Office: {{ inventory.office.office_nm }}
+</div>
+
+<div class="info-line">
+Condition: {{ inventory.inventory_condition }}
+</div>
+
+</div>
+</div>
+{% else %}
+
+<div class="flash flash-danger">
+No inventory item selected.
+</div>
+
+{% endif %}
+
+
+
+<!-- STUDENT INFO -->
+{% if student %}
+<div class="student-box">
+
+<strong>Student:</strong> {{ student.name }} <br>
+<strong>ID:</strong> {{ student.number }} <br>
+<strong>Course:</strong> {{ student.course }} {{ student.year }}
+
+</div>
+{% endif %}
+
+
+
+<!-- BORROW FORM -->
+<form method="POST">
+
+{{ form.hidden_tag() }}
+
+<!-- Hidden Inventory ID -->
+{{ form.inventory_id(type="hidden") }}
+
+<div class="form-group">
+
+<label for="remarks">Remarks (Optional)</label>
+
+{{ form.remarks(
+    id="remarks",
+    class="form-control",
+    placeholder="Purpose of borrowing or additional notes"
+) }}
+
+{% if form.remarks.errors %}
+<small style="color:red;">
+{{ form.remarks.errors[0] }}
+</small>
+{% endif %}
+
+</div>
+
+
+<button type="submit" class="submit-btn">
+{{ form.submit.label.text }}
+</button>
+
+</form>
+
+</div>
+
 </div>
 
 </body>
