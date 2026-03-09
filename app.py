@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response
 from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory, EquipmentApprover, Reports
 from sqlalchemy import func, or_
-from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm
+from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm, StudentFollowUpForm
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone, timedelta
 import io
@@ -641,6 +641,28 @@ def student_information():
         return redirect(url_for('student_dashboard'))
 
     return render_template('student-information.html', form=form)
+
+@app.route('/student/myrequests', methods=['GET', 'POST'])
+def student_requests():
+    requests = []
+    student = None
+    searched = False
+
+    if request.method == 'POST':
+        student_number = request.form.get('student_number', '').strip()
+        searched = True
+        student = Student.query.filter_by(student_number=student_number).first()
+
+        if student:
+            requests = (
+                BorrowTracker.query
+                .options(joinedload(BorrowTracker.inventory))
+                .filter_by(student_id=student.student_id)
+                .order_by(BorrowTracker.request_date.desc())
+                .all()
+            )
+
+    return render_template('student-requests.html', requests=requests, student=student, searched=searched)
 
 @app.route('/student/dashboard', methods=['GET', 'POST'])
 def student_dashboard():

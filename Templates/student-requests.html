@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+    <title>My request</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{url_for('static', filename='landing.css') }}">
+    <link rel ="icon" type ="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
+</head>
+<body>
+    <main class="main-content">
+
+    <div class="page-header">
+        <h2>Check My Requests</h2>
+    </div>
+
+    <!-- Search Form -->
+    <div class="controls-container" style="margin-bottom:1.5rem;">
+        <form method="post" action="{{ url_for('student_requests') }}" style="display:flex; gap:8px; align-items:center;">
+            <div class="search-box">
+                <i class="fa-solid fa-id-card"></i>
+                <input type="text" name="student_number" placeholder="Enter your student ID number..." 
+                    value="{{ student.student_number if student else '' }}" required>
+            </div>
+            <button class="action-btn" type="submit">Search</button>
+        </form>
+    </div>
+
+    {% if searched %}
+        {% if student %}
+            <div style="margin-bottom:1rem;">
+                <strong>{{ student.student_nm }}</strong> — {{ student.student_course }}, Year {{ student.student_year }}
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Req ID</th>
+                            <th>Item</th>
+                            <th>Request Date</th>
+                            <th>Borrow Date</th>
+                            <th>Return Date</th>
+                            <th>Status</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in requests %}
+                        <tr>
+                            <td>REQ-{{ req.borrow_id }}</td>
+                            <td>{{ req.inventory.inventory_nm }}</td>
+                            <td>{{ req.request_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>{{ req.borrow_date.strftime('%Y-%m-%d') if req.borrow_date else 'N/A' }}</td>
+                            <td>{{ req.return_date.strftime('%Y-%m-%d') if req.return_date else 'N/A' }}</td>
+                            <td>
+                                {% if req.status == 'pending' %}
+                                    <span class="badge pending">Pending</span>
+                                {% elif req.status == 'approved' %}
+                                    <span class="badge approved">Approved</span>
+                                {% elif req.status == 'rejected' %}
+                                    <span class="badge rejected">Rejected</span>
+                                {% elif req.status == 'borrowed' %}
+                                    <span class="badge active-borrow">Borrowed</span>
+                                {% elif req.status == 'returned' %}
+                                    <span class="badge returned">Returned</span>
+                                {% elif req.status == 'overdue' %}
+                                    <span class="badge overdue">Overdue</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ req.remarks or '—' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7">No requests found for this student.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+            <p style="color:#f87171;">No student found with that ID number.</p>
+        {% endif %}
+    {% endif %}
+
+</main>
+    
+</body>
+</html>

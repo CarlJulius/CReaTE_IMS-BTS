@@ -15,6 +15,15 @@ class StudentForm(FlaskForm):
     year = StringField('Year', validators=[DataRequired(), Length(min=1, max=20)])
     submit = SubmitField('Submit')
 
+class StudentFollowUpForm(FlaskForm):
+    student_id = StringField(
+        'Student ID',
+        validators=[
+            DataRequired(),
+            Regexp(r'^\d{3}\s*-\s*\d{5}$', message='ID must be like 201 - 00123')
+        ]
+    )
+    submit = SubmitField('Submit')
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=1, max=50)])
