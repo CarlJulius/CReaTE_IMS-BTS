@@ -8,6 +8,15 @@
             <i class="fa-solid fa-plus"></i> Add New Item
         </button>
     </div>
+    <div class="controls-container" style="margin-bottom: 1rem;">
+    <form method="get" action="{{ url_for('inventory') }}" style="display:flex; gap:8px; align-items:center;">
+        <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" name="q" placeholder="Search by name, serial, or category..." value="{{ q|default('') }}">
+        </div>
+        <button class="action-btn" type="submit">Search</button>
+    </form>
+    </div>
 
     <!-- Reusable Modal -->
     <div id="itemModal" class="modal" style="display:none;">

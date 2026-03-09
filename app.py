@@ -92,14 +92,26 @@ def admin_dashboard():
         .all()
     )
 
+    # Recent activities - last 10 actions across all statuses
+    recent_activities = (
+        BorrowTracker.query
+        .options(
+            joinedload(BorrowTracker.student),
+            joinedload(BorrowTracker.inventory)
+        )
+        .order_by(BorrowTracker.request_date.desc())
+        .limit(10)
+        .all()
+    )
+
     return render_template(
         'admin-dashboard.html',
         total_items=total_items,
         pending_count=pending_count,
         overdue_count=overdue_count,
-        recent_requests=recent_requests
+        recent_requests=recent_requests,
+        recent_activities=recent_activities
     )
-
 @app.route('/admin/borrowed-items', methods=['GET', 'POST'])
 def borrowed_items():
     from sqlalchemy.orm import joinedload, contains_eager
