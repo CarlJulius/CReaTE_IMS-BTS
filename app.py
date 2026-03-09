@@ -680,14 +680,15 @@ def student_dashboard():
     student = session['student']
     search = request.args.get('search', '').strip()
     category_filter = request.args.get('category', 'all')
-    inventories = Inventory.query
+
+    inventories = Inventory.query.join(Category)  # join once
 
     if category_filter != 'all':
-        inventories = inventories.join(Category).filter(Category.category_nm == category_filter)
+        inventories = inventories.filter(Category.category_nm == category_filter)
 
     if search:
         search_pattern = f"%{search}%"
-        inventories = inventories.join(Category).filter(
+        inventories = inventories.filter(
             or_(
                 Inventory.inventory_nm.ilike(search_pattern),
                 Inventory.serial_number.ilike(search_pattern),
@@ -699,25 +700,21 @@ def student_dashboard():
     inventories = inventories.all()
     items = []
 
-    for inventory in inventories:
+    for inv in inventories:
         items.append({
-            'id': inventory.inventory_id,
-            'name': inventory.inventory_nm,
-            'category': inventory.category.category_nm if inventory.category else '',
-            'desc': f"serial: {inventory.serial_number}, condition: {inventory.inventory_condition}",
-            'available': inventory.is_available
+            'id': inv.inventory_id,
+            'name': inv.inventory_nm,
+            'category': inv.category.category_nm if inv.category else '',
+            'desc': inv.inventory_desc or '',
+            'serial': inv.serial_number,
+            'condition': inv.inventory_condition,
+            'office': inv.office.office_nm if inv.office else 'N/A',
+            'available': inv.is_available
         })
-
-    total_items = len(items)
-    available_items = sum(1 for i in items if i['available'])
-    categories = set(i['category'] for i in items)
 
     return render_template(
         'student-dashboard.html',
         items=items,
-        total_items=total_items,
-        available_items=available_items,
-        categories=len(categories),
         current_category=category_filter,
         search_query=search,
         student=student

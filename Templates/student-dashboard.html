@@ -5,7 +5,7 @@
   <title>Student Dashboard — CReATe CSU</title>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='student-dashboard.css') }}">
-  <link rel ="icon" type ="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
 </head>
 <body>
 
@@ -20,9 +20,8 @@
   </div>
   <div class="nav-user">
     <span style="font-size:0.78rem">Hello, {{ student.name }}</span>
-    <a href="{{url_for('student_logout')}}">
+    <a href="{{ url_for('student_logout') }}">
       <button class="nav-logout">Logout</button>
-
     </a>
     <div class="nav-avatar">S</div>
   </div>
@@ -57,58 +56,63 @@
 
   <!-- TOOLBAR: Search + Filters -->
   <div class="toolbar">
-    <div class="search-wrap">
+    <form method="get" action="{{ url_for('student_dashboard') }}" class="search-wrap">
       <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/>
         <path d="m21 21-4.35-4.35"/>
       </svg>
-      <input type="text" class="search-input" placeholder="Inventory Search..." disabled>
-      <button class="search-clear" disabled>✕</button>
-    </div>
-   <div class="filter-row">
-    {% set categories = items|map(attribute='category')|unique|list %}
-    {% for cat in categories %}
-    <a href="{{ url_for('student_dashboard', category=cat) }}" 
-       class="filter-btn {% if current_category == cat %}active{% endif %}">
-      {{ cat }}
-    </a>
-  {% endfor %}
+      <input type="text" name="search" class="search-input"
+        placeholder="Inventory Search..."
+        value="{{ search_query|default('') }}">
+      <button type="submit" class="search-clear">🔍</button>
+    </form>
+    <div class="filter-row">
+      {% set categories = items|map(attribute='category')|unique|list %}
+      {% for cat in categories %}
+      <a href="{{ url_for('student_dashboard', category=cat) }}"
+         class="filter-btn {% if current_category == cat %}active{% endif %}">
+        {{ cat }}
+      </a>
+      {% endfor %}
     </div>
   </div>
 
   <!-- GRID -->
-    <div class="grid">
-      {% if items %}
-        {% for item in items %}
-        <div class="card">
-          <div class="card-top">
-            <span class="avail-badge {{ 'yes' if item.available else 'no' }}">
-              {{ 'Available' if item.available else 'Unavailable' }}
-            </span>
-          </div>
-          <div class="item-name">{{ item.name }}</div>
-          <div class="item-desc">{{ item.desc }}</div>
-          <div class="card-footer">
-            <span class="tag">{{ item.category }}</span>
-            <div style="display:flex;gap:6px;align-items:center">
-              <button class="card-btn view-btn" onclick="openModal({{ item.id }})">Details</button>
-              {% if item.available %}
-              <button class="card-btn borrow" onclick="window.location.href='/student/borrow?inventory_id={{ item.id }}'">📦 Borrow</button>
-              {% else %}
-              <button class="card-btn waitlist" disabled>⏳ Unavailable</button>
-              {% endif %}
-            </div>
+  <div class="grid">
+    {% if items %}
+      {% for item in items %}
+      <div class="card">
+        <div class="card-top">
+          <span class="avail-badge {{ 'yes' if item.available else 'no' }}">
+            {{ 'Available' if item.available else 'Unavailable' }}
+          </span>
+        </div>
+        <div class="item-name">{{ item.name }}</div>
+        <div class="item-desc">{{ item.desc or 'No description available.' }}</div>
+        <div class="item-desc" style="font-size:0.75rem; opacity:0.6; margin-top:4px;">
+          📍 {{ item.office }}
+        </div>
+        <div class="card-footer">
+          <span class="tag">{{ item.category }}</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="card-btn view-btn" onclick="openModal({{ item.id }})">Details</button>
+            {% if item.available %}
+            <button class="card-btn borrow" onclick="window.location.href='/student/borrow?inventory_id={{ item.id }}'">📦 Borrow</button>
+            {% else %}
+            <button class="card-btn waitlist" disabled>⏳ Unavailable</button>
+            {% endif %}
           </div>
         </div>
-        {% endfor %}
-      {% else %}
-        <div class="empty-state">
-          <div class="empty-icon">🔍</div>
-          <h3>No items found</h3>
-          <p>Try adjusting your search or filter</p>
-        </div>
-      {% endif %}
-    </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>No items found</h3>
+        <p>Try adjusting your search or filter</p>
+      </div>
+    {% endif %}
+  </div>
 </div>
 
 <!-- DETAIL MODAL -->
@@ -146,28 +150,38 @@
     selectedItem = selectedItem.find(i => i.id === itemId);
     if (!selectedItem) return;
 
-    document.getElementById('modalIcon').textContent = selectedItem.emoji || '';
+    document.getElementById('modalIcon').textContent = '📦';
     document.getElementById('modalName').textContent = selectedItem.name;
     document.getElementById('modalStatus').textContent = selectedItem.available ? '● Available for borrowing' : '● Currently unavailable';
-    document.getElementById('modalDesc').textContent = selectedItem.desc;
+    document.getElementById('modalDesc').textContent = selectedItem.desc || 'No description available.';
 
     const specs = document.getElementById('modalSpecs');
     specs.innerHTML = '';
-    if(selectedItem.specs){
-      Object.entries(selectedItem.specs).forEach(([k,v]) => {
-        const div = document.createElement('div');
-        div.className = 'spec-item';
-        div.innerHTML = `<div class="spec-k">${k}</div><div class="spec-v">${v}</div>`;
-        specs.appendChild(div);
-      });
-    }
+
+    const specData = {
+      'Category': selectedItem.category || 'N/A',
+      'Office': selectedItem.office || 'N/A',
+      'Serial No.': selectedItem.serial || 'N/A',
+      'Condition': selectedItem.condition || 'N/A',
+    };
+
+    Object.entries(specData).forEach(([k, v]) => {
+      const div = document.createElement('div');
+      div.className = 'spec-item';
+      div.innerHTML = `<div class="spec-k">${k}</div><div class="spec-v">${v}</div>`;
+      specs.appendChild(div);
+    });
 
     const btn = document.getElementById('modalActionBtn');
-    if(selectedItem.available){
+    if (selectedItem.available) {
       btn.textContent = '📦 Request to Borrow';
+      btn.style.opacity = '1';
+      btn.disabled = false;
       btn.onclick = () => window.location.href = `/student/borrow?inventory_id=${selectedItem.id}`;
     } else {
-      btn.textContent = '⏳ Join Waitlist';
+      btn.textContent = '⏳ Unavailable';
+      btn.style.opacity = '0.5';
+      btn.disabled = true;
       btn.onclick = null;
     }
 
@@ -175,14 +189,14 @@
     document.body.style.overflow = 'hidden';
   }
 
-  function closeModal(e){
-    if(e && e.target !== document.getElementById('modalOverlay')) return;
+  function closeModal(e) {
+    if (e && e.target !== document.getElementById('modalOverlay')) return;
     document.getElementById('modalOverlay').classList.remove('open');
     document.body.style.overflow = '';
   }
 
   document.addEventListener('keydown', e => {
-    if(e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') closeModal();
   });
 </script>
 
