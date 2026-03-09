@@ -4,6 +4,7 @@ from sqlalchemy import func, or_
 from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm, StudentFollowUpForm
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone, timedelta
+from functools import wraps
 import io
 import csv
 
@@ -18,7 +19,15 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-
+# Admin required decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'faculty' not in session:
+            flash('Please log in first.', 'warning')
+            return redirect(url_for('admin'))
+        return f(*args, **kwargs)
+    return decorated
 
 # Routes for admin and student interfaces/landing page
 @app.route('/')
@@ -28,14 +37,27 @@ def index():
 ######################Admin login#########################
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
+    if 'faculty' in session:
+        return redirect(url_for('admin_dashboard'))
     form = LoginForm()
     if form.validate_on_submit():
         faculty = Faculty.query.filter_by(username=form.username.data).first()
         if faculty and check_password_hash(faculty.password, form.password.data):
+            session['faculty'] = {
+                'id': faculty.faculty_id,
+                'name': faculty.faculty_nm,
+                'username': faculty.username
+            }
             return redirect(url_for('admin_dashboard'))
         else:
             flash('Invalid username or password', 'danger')
     return render_template('admin-login.html', form=form)
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('faculty', None)
+    flash('Logged out successfully.', 'info')
+    return redirect(url_for('admin'))
 
 @app.route('/admin/signup', methods=['GET', 'POST'])
 def signup():
@@ -73,6 +95,7 @@ def signup():
 #########################Admin dashboard and management pages#########################
 
 @app.route('/admin/dashboard', methods=['GET', 'POST'])
+@admin_required
 def admin_dashboard():
     from sqlalchemy.orm import joinedload
 
@@ -92,7 +115,6 @@ def admin_dashboard():
         .all()
     )
 
-    # Recent activities - last 10 actions across all statuses
     recent_activities = (
         BorrowTracker.query
         .options(
@@ -112,7 +134,9 @@ def admin_dashboard():
         recent_requests=recent_requests,
         recent_activities=recent_activities
     )
+
 @app.route('/admin/borrowed-items', methods=['GET', 'POST'])
+@admin_required
 def borrowed_items():
     from sqlalchemy.orm import joinedload, contains_eager
 
@@ -149,6 +173,7 @@ def borrowed_items():
     return render_template('borrowed-items.html', items=items, q=q)
 
 @app.route('/admin/borrowed-items/return/<int:borrow_id>', methods=['POST'])
+@admin_required
 def mark_returned(borrow_id):
     borrow = BorrowTracker.query.get_or_404(borrow_id)
     borrow.status = 'returned'
@@ -158,6 +183,7 @@ def mark_returned(borrow_id):
     return redirect(url_for('borrowed_items'))
 
 @app.route('/admin/inventory', methods=['GET', 'POST'])
+@admin_required
 def inventory():
     add_form = InventoryForm()
     office_list = Office.query.all()
@@ -222,18 +248,16 @@ def inventory():
     return render_template('manage-inventory.html', items=items, add_form=add_form, q=q, office_list=office_list)
 
 @app.route('/admin/inventory/edit/<int:item_id>', methods=['POST'])
+@admin_required
 def edit_inventory(item_id):
     form = InventoryForm()
     if form.validate_on_submit():
         inv = Inventory.query.get_or_404(item_id)
-
-        # Update basic fields
         inv.inventory_nm = form.name.data.strip()
         inv.inventory_condition = form.condition.data.strip()
         inv.serial_number = form.serial.data.strip()
         inv.inventory_desc = form.desc.data.strip() if form.desc.data else None
 
-        # Update category
         cat_name = form.category.data.strip()
         category = Category.query.filter_by(category_nm=cat_name).first()
         if not category:
@@ -241,10 +265,7 @@ def edit_inventory(item_id):
             db.session.add(category)
             db.session.commit()
         inv.category_id = category.category_id
-
-        # Update office
-        inv.office_id = form.office.data  
-
+        inv.office_id = form.office.data
         db.session.commit()
         flash('Inventory item updated.', 'success')
     else:
@@ -253,6 +274,7 @@ def edit_inventory(item_id):
     return redirect(url_for('inventory'))
 
 @app.route('/admin/inventory/delete/<int:item_id>', methods=['POST'])
+@admin_required
 def delete_inventory(item_id):
     inv = Inventory.query.get_or_404(item_id)
     BorrowTracker.query.filter_by(inventory_id=inv.inventory_id).delete()
@@ -264,33 +286,43 @@ def delete_inventory(item_id):
 from sqlalchemy.orm import joinedload
 
 @app.route('/admin/requests')
+@admin_required
 def requests():
-
     q = request.args.get('q', '').strip()
 
-    query = BorrowTracker.query.options(
-        joinedload(BorrowTracker.student),
-        joinedload(BorrowTracker.inventory)
-    ).filter(BorrowTracker.status == 'pending')
-
     if q:
-        query = query.join(Student).filter(
-            or_(
-                Student.student_nm.ilike(f"%{q}%"),
-                Student.student_number.ilike(f"%{q}%")
+        from sqlalchemy.orm import contains_eager
+        pending_requests = (
+            BorrowTracker.query
+            .join(BorrowTracker.student)
+            .options(
+                contains_eager(BorrowTracker.student),
+                joinedload(BorrowTracker.inventory)
             )
+            .filter(BorrowTracker.status == 'pending')
+            .filter(
+                or_(
+                    Student.student_nm.ilike(f"%{q}%"),
+                    Student.student_number.ilike(f"%{q}%")
+                )
+            )
+            .all()
+        )
+    else:
+        pending_requests = (
+            BorrowTracker.query
+            .options(
+                joinedload(BorrowTracker.student),
+                joinedload(BorrowTracker.inventory)
+            )
+            .filter(BorrowTracker.status == 'pending')
+            .all()
         )
 
-    pending_requests = query.all()
-    
-
-    return render_template(
-        'manage-request.html',
-        requests=pending_requests,
-        q=q
-    )
+    return render_template('manage-request.html', requests=pending_requests, q=q)
 
 @app.route('/admin/requests/approve/<int:borrow_id>', methods=['POST'])
+@admin_required
 def approve_request(borrow_id):
     borrow = BorrowTracker.query.get_or_404(borrow_id)
 
@@ -312,11 +344,11 @@ def approve_request(borrow_id):
 
     borrow.inventory.is_available = False
     db.session.commit()
-
     flash('Request approved.', 'success')
     return redirect(url_for('requests'))
 
 @app.route('/admin/requests/reject/<int:borrow_id>', methods=['POST'])
+@admin_required
 def reject_request(borrow_id):
     borrow = BorrowTracker.query.get_or_404(borrow_id)
     if borrow.status != 'pending':
@@ -326,15 +358,12 @@ def reject_request(borrow_id):
     borrow.status = 'rejected'
     borrow.remarks = request.form.get('remarks', '').strip() or borrow.remarks
     db.session.commit()
-
     flash('Request rejected.', 'info')
     return redirect(url_for('requests'))
 
 @app.route('/admin/reports', methods=['GET', 'POST'])
+@admin_required
 def reports():
-    from sqlalchemy.orm import joinedload
-
-    # Date filters
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
 
@@ -345,11 +374,9 @@ def reports():
     if date_to:
         query = query.filter(BorrowTracker.request_date <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
 
-    # Stats
     total_borrows = query.count()
     damage_reports = Reports.query.count()
 
-    # Most borrowed item
     most_borrowed = (
         db.session.query(Inventory.inventory_nm, func.count(BorrowTracker.inventory_id).label('borrow_count'))
         .join(BorrowTracker, BorrowTracker.inventory_id == Inventory.inventory_id)
@@ -358,21 +385,17 @@ def reports():
         .first()
     )
 
-    # Past 7 days activity
     today = datetime.now(timezone.utc).date()
     days = [(today - timedelta(days=i)) for i in range(6, -1, -1)]
     daily_counts = []
     max_count = 1
 
     for day in days:
-        count = BorrowTracker.query.filter(
-            func.date(BorrowTracker.request_date) == day
-        ).count()
+        count = BorrowTracker.query.filter(func.date(BorrowTracker.request_date) == day).count()
         daily_counts.append({'day': day.strftime('%a'), 'count': count})
         if count > max_count:
             max_count = count
 
-    # Calculate bar heights as percentages
     for d in daily_counts:
         d['height'] = int((d['count'] / max_count) * 100) if max_count > 0 else 0
 
@@ -387,6 +410,7 @@ def reports():
     )
 
 @app.route('/admin/reports/export')
+@admin_required
 def export_csv():
     records = BorrowTracker.query.options(
         joinedload(BorrowTracker.student),
@@ -418,6 +442,7 @@ def export_csv():
     )
 
 @app.route('/admin/office', methods=['GET', 'POST'])
+@admin_required
 def office():
     form = OfficeForm()
     faculty_list = Faculty.query.all()
@@ -444,11 +469,10 @@ def office():
     else:
         offices = Office.query.all()
 
-   
-
     return render_template('manage-office.html', add_form=form, q=q, faculty_list=faculty_list, offices=offices)
 
 @app.route('/admin/office/edit/<int:office_id>', methods=['POST'])
+@admin_required
 def edit_office(office_id):
     form = OfficeForm()
     if form.validate_on_submit():
@@ -459,13 +483,12 @@ def edit_office(office_id):
         flash('Office updated.', 'success')
     else:
         flash('Failed to update office.', 'danger')
-
     return redirect(url_for('office'))
 
 @app.route('/admin/office/delete/<int:office_id>', methods=['POST'])
+@admin_required
 def delete_office(office_id):
     off = Office.query.get_or_404(office_id)
-
     assigned_count = Inventory.query.filter_by(office_id=off.office_id).count()
 
     if assigned_count > 0:
@@ -474,26 +497,22 @@ def delete_office(office_id):
 
     db.session.delete(off)
     db.session.commit()
-
     flash('Office deleted.', 'success')
     return redirect(url_for('office'))
 
 @app.route('/admin/office/assign/<int:office_id>', methods=['POST'])
+@admin_required
 def assign_office_head(office_id):
     faculty_id = request.form.get('faculty_id')
-    
+
     if not faculty_id:
         flash("Please select a faculty member.", "error")
         return redirect(url_for('office'))
 
-    # Check if an approver record already exists for this office
     existing_record = EquipmentApprover.query.filter_by(office_id=office_id).first()
-
     if existing_record:
-        # Update existing
         existing_record.faculty_id = faculty_id
     else:
-        # Create new
         new_head = EquipmentApprover(office_id=office_id, faculty_id=faculty_id)
         db.session.add(new_head)
 
@@ -507,6 +526,7 @@ def assign_office_head(office_id):
     return redirect(url_for('office'))
 
 @app.route('/admin/faculty', methods=['GET', 'POST'])
+@admin_required
 def faculty():
     form = FacultyForm()
 
@@ -518,7 +538,6 @@ def faculty():
 
         office_name = form.office.data.strip()
         office = Office.query.filter_by(office_nm=office_name).first()
-
         if not office:
             office = Office(office_nm=office_name, office_loc='')
             db.session.add(office)
@@ -530,10 +549,8 @@ def faculty():
             password=generate_password_hash(form.password.data.strip()),
             office_id=office.office_id
         )
-
         db.session.add(new_faculty)
         db.session.commit()
-
         flash('Faculty added.', 'success')
         return redirect(url_for('faculty'))
 
@@ -562,12 +579,12 @@ def faculty():
     return render_template('manage-faculty.html', items=items, add_form=form, q=q)
 
 @app.route('/admin/faculty/edit/<int:faculty_id>', methods=['POST'])
+@admin_required
 def edit_faculty(faculty_id):
     form = FacultyForm()
 
     if form.validate_on_submit():
         fac = Faculty.query.get_or_404(faculty_id)
-
         fac.faculty_nm = form.name.data.strip()
         fac.username = form.username.data.strip()
 
@@ -576,24 +593,21 @@ def edit_faculty(faculty_id):
 
         office_name = form.office.data.strip()
         office = Office.query.filter_by(office_nm=office_name).first()
-
         if not office:
             office = Office(office_nm=office_name, office_loc='')
             db.session.add(office)
             db.session.commit()
 
         fac.office_id = office.office_id
-
         db.session.commit()
-
         flash('Faculty updated.', 'success')
-
     else:
         flash('Failed to update faculty.', 'danger')
 
     return redirect(url_for('faculty'))
 
 @app.route('/admin/category', methods=['GET', 'POST'])
+@admin_required
 def category():
     form = CategoryForm()
     return render_template('manage-category.html')
@@ -602,7 +616,6 @@ def category():
 
 @app.route('/student/information', methods=['GET', 'POST'])
 def student_information():
-
     if 'student' in session:
         flash('Student information already provided.', 'info')
         return redirect(url_for('student_dashboard'))
@@ -610,12 +623,8 @@ def student_information():
     form = StudentForm()
 
     if form.validate_on_submit():
-
         student_number = form.id_number.data.strip()
-
-        student = Student.query.filter_by(
-            student_number=student_number
-        ).first()
+        student = Student.query.filter_by(student_number=student_number).first()
 
         if not student:
             student = Student(
@@ -624,7 +633,6 @@ def student_information():
                 student_course=form.course.data.strip(),
                 student_year=form.year.data.strip()
             )
-
             db.session.add(student)
             db.session.commit()
 
@@ -637,7 +645,6 @@ def student_information():
         }
 
         flash('Student information saved.', 'success')
-
         return redirect(url_for('student_dashboard'))
 
     return render_template('student-information.html', form=form)
@@ -666,16 +673,13 @@ def student_requests():
 
 @app.route('/student/dashboard', methods=['GET', 'POST'])
 def student_dashboard():
-
     if 'student' not in session:
         flash('Please enter your information first.', 'warning')
         return redirect(url_for('student_information'))
 
     student = session['student']
-
     search = request.args.get('search', '').strip()
     category_filter = request.args.get('category', 'all')
-
     inventories = Inventory.query
 
     if category_filter != 'all':
@@ -693,7 +697,6 @@ def student_dashboard():
         )
 
     inventories = inventories.all()
-
     items = []
 
     for inventory in inventories:
@@ -746,18 +749,16 @@ def student_borrow():
             flash('Item is currently unavailable.', 'danger')
             return redirect(url_for('student_dashboard'))
 
-        # --- Get approver from office (optional, but for future reference) ---
         approver_id = None
         if inventory_item.office.approver_config:
             approver_id = inventory_item.office.approver_config.faculty_id
 
-        # --- Create borrow request ---
         borrow_record = BorrowTracker(
             student_id=student['id'],
             inventory_id=inventory_item.inventory_id,
             status='pending',
             remarks=form.remarks.data.strip() if form.remarks.data else None,
-            approved_by=approver_id  # can be None for now
+            approved_by=approver_id
         )
 
         db.session.add(borrow_record)
@@ -766,12 +767,7 @@ def student_borrow():
         flash('Borrow request submitted. Waiting for approval.', 'success')
         return redirect(url_for('student_dashboard'))
 
-    return render_template(
-        'student-borrow.html',
-        form=form,
-        inventory=inventory_item,
-        student=student
-    )
+    return render_template('student-borrow.html', form=form, inventory=inventory_item, student=student)
 
 @app.route('/student/logout')
 def student_logout():
