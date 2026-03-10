@@ -92,6 +92,43 @@ def signup():
 
     return render_template('admin-signup.html', form=form)
 
+@app.route('/admin/profile/edit', methods=['POST'])
+@admin_required
+def edit_profile():
+    faculty_id = session['faculty']['id']
+    fac = Faculty.query.get_or_404(faculty_id)
+
+    faculty_nm = request.form.get('faculty_nm', '').strip()
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+    confirm_password = request.form.get('confirm_password', '').strip()
+
+    # Check username not taken by someone else
+    existing = Faculty.query.filter_by(username=username).first()
+    if existing and existing.faculty_id != faculty_id:
+        flash('Username already taken.', 'danger')
+        return redirect(request.referrer or url_for('admin_dashboard'))
+
+    if password:
+        if password != confirm_password:
+            flash('Passwords do not match.', 'danger')
+            return redirect(request.referrer or url_for('admin_dashboard'))
+        fac.password = generate_password_hash(password)
+
+    fac.faculty_nm = faculty_nm
+    fac.username = username
+    db.session.commit()
+
+    # Update session
+    session['faculty'] = {
+        'id': fac.faculty_id,
+        'name': fac.faculty_nm,
+        'username': fac.username
+    }
+
+    flash('Profile updated successfully.', 'success')
+    return redirect(request.referrer or url_for('admin_dashboard'))
+
 #########################Admin dashboard and management pages#########################
 
 @app.route('/admin/dashboard', methods=['GET', 'POST'])
@@ -116,14 +153,14 @@ def admin_dashboard():
     )
 
     recent_activities = (
-        BorrowTracker.query
-        .options(
-            joinedload(BorrowTracker.student),
-            joinedload(BorrowTracker.inventory)
-        )
-        .order_by(BorrowTracker.request_date.desc())
-        .limit(10)
-        .all()
+    BorrowTracker.query
+    .options(
+        joinedload(BorrowTracker.student),
+        joinedload(BorrowTracker.inventory)
+    )
+    .order_by(BorrowTracker.request_date.desc())
+    .limit(10)
+    .all()
     )
 
     return render_template(
@@ -424,9 +461,9 @@ def export_csv():
     for r in records:
         writer.writerow([
             r.borrow_id,
-            r.student.student_nm,
-            r.student.student_number,
-            r.inventory.inventory_nm,
+            r.student.student_nm if r.student else 'N/A',
+            r.student.student_number if r.student else 'N/A',
+            r.inventory.inventory_nm if r.inventory else 'N/A',
             r.status,
             r.request_date.strftime('%Y-%m-%d %H:%M') if r.request_date else '',
             r.borrow_date.strftime('%Y-%m-%d') if r.borrow_date else '',

@@ -30,145 +30,145 @@
             </div>
         </div>
 
-        <!-- Tabbed Borrow Requests -->
-        <div class="table-container" style="margin-top:1.5rem;">
-            <h2>Borrow Requests</h2>
+        <!-- 2x2 Grid of Tables -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1.5rem;">
 
-            <!-- Tabs -->
-            <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-                <button class="tab-btn active" onclick="switchTab('pending', this)">
-                    <i class="fa-solid fa-clock"></i> Pending
-                </button>
-                <button class="tab-btn" onclick="switchTab('approved', this)">
-                    <i class="fa-solid fa-circle-check"></i> Approved
-                </button>
-                <button class="tab-btn" onclick="switchTab('rejected', this)">
-                    <i class="fa-solid fa-circle-xmark"></i> Rejected
-                </button>
-                <button class="tab-btn" onclick="switchTab('returned', this)">
-                    <i class="fa-solid fa-rotate-left"></i> Returned
-                </button>
+            <!-- Pending -->
+            <div class="table-container">
+                <h2><i class="fa-solid fa-clock" style="color:#facc15;"></i> Pending</h2>
+                <div style="max-height:220px; overflow-y:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Item</th>
+                                <th>Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set pending = recent_activities|selectattr('status', 'equalto', 'pending')|list %}
+                            {% for req in pending %}
+                            <tr>
+                                <td>
+                                    <strong>{{ req.student.student_nm }}</strong><br>
+                                    <span style="font-size:11px; opacity:0.6;">{{ req.student.student_number }}</span>
+                                </td>
+                                <td>{{ req.inventory.inventory_nm }}</td>
+                                <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
+                                <td><a href="{{ url_for('requests') }}" class="action-btn approve" style="font-size:11px; padding:4px 8px;">Manage</a></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4">No pending requests.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <!-- Pending Tab -->
-            <div id="tab-pending" class="tab-content" style="max-height:300px; overflow-y:auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Student ID</th>
-                            <th>Item</th>
-                            <th>Request Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set pending = recent_activities|selectattr('status', 'equalto', 'pending')|list %}
-                        {% for req in pending %}
-                        <tr>
-                            <td>{{ req.student.student_nm }}</td>
-                            <td>{{ req.student.student_number }}</td>
-                            <td>{{ req.inventory.inventory_nm }}</td>
-                            <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
-                            <td><a href="{{ url_for('requests') }}" class="action-btn approve">Manage</a></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5">No pending requests.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <!-- Approved -->
+            <div class="table-container">
+                <h2><i class="fa-solid fa-circle-check" style="color:#4ade80;"></i> Approved</h2>
+                <div style="max-height:220px; overflow-y:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Item</th>
+                                <th>Borrow Date</th>
+                                <th>Return Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set approved = recent_activities|selectattr('status', 'equalto', 'approved')|list %}
+                            {% for req in approved %}
+                            <tr>
+                                <td>
+                                    <strong>{{ req.student.student_nm }}</strong><br>
+                                    <span style="font-size:11px; opacity:0.6;">{{ req.student.student_number }}</span>
+                                </td>
+                                <td>{{ req.inventory.inventory_nm }}</td>
+                                <td>{{ req.borrow_date.strftime('%Y-%m-%d') if req.borrow_date else 'N/A' }}</td>
+                                <td>{{ req.return_date.strftime('%Y-%m-%d') if req.return_date else 'N/A' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4">No approved requests.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <!-- Approved Tab -->
-            <div id="tab-approved" class="tab-content" style="display:none; max-height:300px; overflow-y:auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Student ID</th>
-                            <th>Item</th>
-                            <th>Borrow Date</th>
-                            <th>Return Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set approved = recent_activities|selectattr('status', 'equalto', 'approved')|list %}
-                        {% for req in approved %}
-                        <tr>
-                            <td>{{ req.student.student_nm }}</td>
-                            <td>{{ req.student.student_number }}</td>
-                            <td>{{ req.inventory.inventory_nm }}</td>
-                            <td>{{ req.borrow_date.strftime('%Y-%m-%d') if req.borrow_date else 'N/A' }}</td>
-                            <td>{{ req.return_date.strftime('%Y-%m-%d') if req.return_date else 'N/A' }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5">No approved requests.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <!-- Rejected -->
+            <div class="table-container">
+                <h2><i class="fa-solid fa-circle-xmark" style="color:#f87171;"></i> Rejected</h2>
+                <div style="max-height:220px; overflow-y:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Item</th>
+                                <th>Date</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set rejected = recent_activities|selectattr('status', 'equalto', 'rejected')|list %}
+                            {% for req in rejected %}
+                            <tr>
+                                <td>
+                                    <strong>{{ req.student.student_nm }}</strong><br>
+                                    <span style="font-size:11px; opacity:0.6;">{{ req.student.student_number }}</span>
+                                </td>
+                                <td>{{ req.inventory.inventory_nm }}</td>
+                                <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ req.remarks or '—' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4">No rejected requests.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <!-- Rejected Tab -->
-            <div id="tab-rejected" class="tab-content" style="display:none; max-height:300px; overflow-y:auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Student ID</th>
-                            <th>Item</th>
-                            <th>Date</th>
-                            <th>Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set rejected = recent_activities|selectattr('status', 'equalto', 'rejected')|list %}
-                        {% for req in rejected %}
-                        <tr>
-                            <td>{{ req.student.student_nm }}</td>
-                            <td>{{ req.student.student_number }}</td>
-                            <td>{{ req.inventory.inventory_nm }}</td>
-                            <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
-                            <td>{{ req.remarks or '—' }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5">No rejected requests.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <!-- Returned -->
+            <div class="table-container">
+                <h2><i class="fa-solid fa-rotate-left" style="color:#a78bfa;"></i> Returned</h2>
+                <div style="max-height:220px; overflow-y:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Item</th>
+                                <th>Return Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set returned = recent_activities|selectattr('status', 'equalto', 'returned')|list %}
+                            {% for req in returned %}
+                            <tr>
+                                <td>
+                                    <strong>{{ req.student.student_nm }}</strong><br>
+                                    <span style="font-size:11px; opacity:0.6;">{{ req.student.student_number }}</span>
+                                </td>
+                                <td>{{ req.inventory.inventory_nm }}</td>
+                                <td>{{ req.return_date.strftime('%Y-%m-%d') if req.return_date else 'N/A' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3">No returned items.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <!-- Returned Tab -->
-            <div id="tab-returned" class="tab-content" style="display:none; max-height:300px; overflow-y:auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Student Name</th>
-                            <th>Student ID</th>
-                            <th>Item</th>
-                            <th>Return Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set returned = recent_activities|selectattr('status', 'equalto', 'returned')|list %}
-                        {% for req in returned %}
-                        <tr>
-                            <td>{{ req.student.student_nm }}</td>
-                            <td>{{ req.student.student_number }}</td>
-                            <td>{{ req.inventory.inventory_nm }}</td>
-                            <td>{{ req.return_date.strftime('%Y-%m-%d') if req.return_date else 'N/A' }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="4">No returned items.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
         </div>
 
         <!-- Recent Activities -->
-        <div class="table-container" style="margin-top:1.5rem;">
+        <div class="table-container" style="margin-top:1rem;">
             <h2>Recent Activities</h2>
-            <div style="max-height:300px; overflow-y:auto;">
+            <div style="max-height:220px; overflow-y:auto;">
                 <table>
                     <thead>
                         <tr>
@@ -231,36 +231,4 @@
 
     </main>
 </body>
-
-<style>
-    .tab-btn {
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        border: 1px solid rgba(255,255,255,0.2);
-        background: transparent;
-        color: white;
-        cursor: pointer;
-        font-size: 0.85rem;
-        transition: all 0.2s;
-    }
-    .tab-btn.active {
-        background: #4ade80;
-        color: #0f1f0f;
-        border-color: #4ade80;
-        font-weight: 600;
-    }
-    .tab-btn:hover:not(.active) {
-        background: rgba(255,255,255,0.1);
-    }
-</style>
-
-<script>
-    function switchTab(tab, btn) {
-        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-        document.getElementById('tab-' + tab).style.display = 'block';
-        btn.classList.add('active');
-    }
-</script>
-
 {% endblock %}
