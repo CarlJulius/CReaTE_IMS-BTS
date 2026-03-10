@@ -10,51 +10,57 @@ body {
     height: 100vh;
     background: url("../static/img/bg_cover.png") no-repeat center center/cover;
     display: flex;
-    flex-direction: column; /* This stacks the Title and Container vertically */
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    padding: 20px; /* Added padding to prevent elements from touching the screen edges on tiny devices */
 }
 
-
-/* New styles for your Title class */
+/* Title styles */
 .Title {
     position: relative;
-    z-index: 1; /* Brings the text above the dark overlay */
-    margin-bottom: 30px; /* Adds breathing room between the title and the buttons */
+    z-index: 1;
+    margin-bottom: 30px;
     text-align: center;
 }
 
 .Title h1 {
-    color: white; /* Makes the text white */
-    font-size: 2rem; /* Makes the title nice and big */
-    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7); /* Adds a subtle shadow to make it pop against the background */
+    color: white;
+    font-size: 2rem;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
 }
 
+/* Logo styles */
 .logo {
-    height: 200px; /* Sets a specific height */
-    width: 200px;  /* MUST have a width to show the background image */
-    background: url("../static/img/CSU-logo.png") no-repeat center center/contain; /* Changed cover to contain */
+    height: 200px;
+    width: 200px;
+    background: url("../static/img/CSU-logo.png") no-repeat center center/contain;
     position: relative; 
-    z-index: 1; /* Brings the logo above the dark overlay */
-    margin-bottom: 15px; /* Adds a little space between the logo and the title */
+    z-index: 1;
+    margin-bottom: 15px;
 }
 
+/* Container styles */
 .container {
     position: relative;
-    z-index: 1; /* Brings the container above the dark overlay */
+    z-index: 1;
     
     /* Glassmorphism Styling */
-    background: rgba(255, 255, 255, 0.15); /* Semi-transparent white background */
-    backdrop-filter: blur(12px); /* Creates the frosted glass blur effect */
-    -webkit-backdrop-filter: blur(12px); /* Ensures it works on Safari */
-    border: 1px solid rgba(255, 255, 255, 0.3); /* Adds a subtle reflection edge */
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     
     /* Original Layout Styling */
     padding: 40px;
     border-radius: 12px;
     text-align: center;
-    width: 400px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* Softened the shadow slightly to fit the glass look */
+    
+    /* MOBILE FIX: Use width 100% but cap it at 400px so it scales down on phones */
+    width: 100%;
+    max-width: 400px; 
+    
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 /* Button styles */
@@ -72,7 +78,6 @@ body {
     text-align: center; 
 }
 
-/* Removes margin from the last button so it aligns perfectly */
 .btn:last-child {
     margin-bottom: 0;
 }
@@ -109,28 +114,26 @@ body {
     padding: 12px 15px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.4);
-    background: rgba(255, 255, 255, 0.1); /* Very subtle glass effect for inputs */
-    color: white; /* White text when typing */
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
     font-size: 16px;
     outline: none;
     transition: all 0.3s ease;
 }
 
-/* Changes the placeholder text color to a light, readable gray/white */
 .input-group input::placeholder {
     color: rgba(255, 255, 255, 0.8);
 }
 
-/* Glow effect when the user clicks on the input box */
 .input-group input:focus {
     background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(40, 167, 69, 0.8); /* Green tint to match the admin theme */
+    border: 1px solid rgba(40, 167, 69, 0.8);
     box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
 }
 
 .link-group {
     display: flex;
-    justify-content: space-between; /* Pushes one link to the left and the other to the right */
+    justify-content: space-between;
     align-items: center;
     margin-top: 20px;
     width: 100%;
@@ -144,8 +147,29 @@ body {
     transition: 0.3s;
 }
 
-/* Hover effect for both links */
 .back-link a:hover, .sign-up a:hover {
     opacity: 1;
     text-decoration: underline;
+}
+
+/* =========================================
+   MOBILE MEDIA QUERIES
+   ========================================= */
+@media (max-width: 480px) {
+    /* Scale down the logo slightly to save vertical space */
+    .logo {
+        height: 140px;
+        width: 140px;
+    }
+
+    /* Shrink the title slightly so it doesn't wrap awkwardly */
+    .Title h1 {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+    }
+
+    /* Reduce the padding inside the container so buttons have more room */
+    .container {
+        padding: 30px 20px;
+    }
 }

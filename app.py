@@ -5,14 +5,18 @@ from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm,
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone, timedelta
 from functools import wraps
+from dotenv import load_dotenv
+import os
 import io
 import csv
 
+load_dotenv()
+
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///inventory.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your_secret_key'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 
 db.init_app(app)
 
