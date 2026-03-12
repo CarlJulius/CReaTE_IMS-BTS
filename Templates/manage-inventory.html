@@ -64,6 +64,51 @@
             </form>
         </div>
     </div>
+    <!-- Details Modal -->
+    <div id="detailsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99999; align-items:center; justify-content:center;">
+        <div style="background:#1a2e1a; padding:2rem; border-radius:12px; width:420px; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);">
+            <h3 style="margin-bottom:1.5rem; color:white;">
+                <i class="fa-solid fa-circle-info"></i> Item Details
+            </h3>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Item Name</label>
+                <p id="detailName" style="color:white; font-weight:600; margin:0;"></p>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Description</label>
+                <p id="detailDesc" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Condition</label>
+                <p id="detailCondition" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Serial Number</label>
+                <p id="detailSerial" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Category</label>
+                <p id="detailCategory" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Office</label>
+                <p id="detailOffice" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end;">
+                <button onclick="closeDetailsModal()"
+                    style="padding:0.5rem 1.25rem; border-radius:20px; border:1px solid rgba(255,255,255,0.3); background:transparent; color:white; cursor:pointer;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Table -->
     <div class="table-container">
@@ -72,8 +117,6 @@
                 <tr>
                     <th>Item ID</th>
                     <th>Item Name</th>
-                    <th>Description</th>
-                    <th>Category</th>
                     <th>Available</th>
                     <th>Status</th>
                     <th>Office</th>
@@ -85,12 +128,15 @@
                 <tr>
                     <td>{{ it.id }}</td>
                     <td>{{ it.name }}</td>
-                    <td>{{ it.desc }}</td>
-                    <td>{{ it.category }}</td>
                     <td>{{ 'Yes' if it.available else 'No' }}</td>
                     <td>{{ it.condition }}</td>
                     <td>{{ it.office }}</td>
                     <td>
+                        <button class="action-btn details-btn" 
+                            onclick="openDetailsModal('{{ it.name }}', '{{ it.desc or 'N/A' }}', '{{ it.condition }}', '{{ it.serial }}', '{{ it.category }}', '{{ it.office }}')"
+                            title="Details">
+                            Details
+                        </button>
                         <button class="icon-btn edit-btn" 
                             data-id="{{ it.id }}"
                             data-name="{{ it.name }}"
@@ -169,6 +215,23 @@
             // Close Modal
             closeBtn.addEventListener('click', ()=> modal.style.display='none');
             window.addEventListener('click', e => { if(e.target === modal) modal.style.display='none'; });
+        });
+        function openDetailsModal(name, desc, condition, serial, category, office) {
+                document.getElementById('detailName').textContent = name;
+                document.getElementById('detailDesc').textContent = desc;
+                document.getElementById('detailCondition').textContent = condition;
+                document.getElementById('detailSerial').textContent = serial;
+                document.getElementById('detailCategory').textContent = category;
+                document.getElementById('detailOffice').textContent = office;
+                document.getElementById('detailsModal').style.display = 'flex';
+            }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        document.getElementById('detailsModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDetailsModal();
         });
     </script>
 </main>

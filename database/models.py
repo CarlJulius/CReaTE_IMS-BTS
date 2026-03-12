@@ -13,6 +13,8 @@ class BorrowTracker(db.Model):
     approve_date = db.Column(db.DateTime, nullable=True)
     borrow_date = db.Column(db.Date, nullable=True)
     return_date = db.Column(db.Date, nullable=True)
+    faculty_incharge = db.Column(db.String(100), nullable=True)
+    contact_number = db.Column(db.String(11), nullable=True)
     remarks = db.Column(db.String(200), nullable=True)
 
     status = db.Column(
@@ -57,7 +59,10 @@ class Office(db.Model):
     # renamed to 'approver_config' to avoid confusion with the 'faculties' list
     approver_config = db.relationship('EquipmentApprover', back_populates='office', uselist=False)
 
-
+# not used yet, but will be used to link offices to their approvers 
+# this is for future interns to work on. 
+# goodluck sa inyo
+# signed. previous interns
 class EquipmentApprover(db.Model):
     __tablename__ = 'equipment_approver'
     approver_id = db.Column(db.Integer, primary_key=True)

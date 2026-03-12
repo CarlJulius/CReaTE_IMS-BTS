@@ -9,8 +9,9 @@ from dotenv import load_dotenv
 import os
 import io
 import csv
+import zipfile
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 app = Flask(__name__)
 
@@ -450,36 +451,65 @@ def reports():
         date_to=date_to
     )
 
+
+
 @app.route('/admin/reports/export')
 @admin_required
 def export_csv():
+    # Borrow records CSV
+    borrow_output = io.StringIO()
+    borrow_writer = csv.writer(borrow_output)
+    borrow_writer.writerow(['Borrow ID', 'Student Name', 'Student Number', 'Faculty In Charge', 'Item', 'Status', 'Request Date', 'Borrow Date', 'Return Date', 'Remarks'])
+
     records = BorrowTracker.query.options(
         joinedload(BorrowTracker.student),
         joinedload(BorrowTracker.inventory)
     ).all()
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['Borrow ID', 'Student Name', 'Student Number', 'Item', 'Status', 'Request Date', 'Borrow Date', 'Return Date', 'Remarks'])
-
     for r in records:
-        writer.writerow([
+        borrow_writer.writerow([
             r.borrow_id,
             r.student.student_nm if r.student else 'N/A',
             r.student.student_number if r.student else 'N/A',
+            r.faculty_incharge or 'N/A',
             r.inventory.inventory_nm if r.inventory else 'N/A',
             r.status,
-            r.request_date.strftime('%Y-%m-%d %H:%M') if r.request_date else '',
+            r.request_date.strftime('%Y-%m-%d') if r.request_date else '',
             r.borrow_date.strftime('%Y-%m-%d') if r.borrow_date else '',
             r.return_date.strftime('%Y-%m-%d') if r.return_date else '',
             r.remarks or ''
         ])
 
-    output.seek(0)
+    # Inventory CSV
+    inventory_output = io.StringIO()
+    inventory_writer = csv.writer(inventory_output)
+    inventory_writer.writerow(['Inventory ID', 'Name', 'Category', 'Description', 'Office', 'Condition', 'Serial Number', 'Status'])
+
+    inventories = Inventory.query.all()
+
+    for inv in inventories:
+        inventory_writer.writerow([
+            inv.inventory_id,
+            inv.inventory_nm,
+            inv.category.category_nm if inv.category else 'N/A',
+            inv.inventory_desc or '',
+            inv.office.office_nm if inv.office else 'N/A',
+            inv.inventory_condition,
+            inv.serial_number,
+            'Available' if inv.is_available else 'Borrowed'
+        ])
+
+    # Zip both CSVs
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.writestr('borrow_records.csv', borrow_output.getvalue())
+        zip_file.writestr('inventory.csv', inventory_output.getvalue())
+
+    zip_buffer.seek(0)
     return Response(
-        output,
-        mimetype='text/csv',
-        headers={'Content-Disposition': 'attachment; filename=borrow_report.csv'}
+        zip_buffer,
+        mimetype='application/zip',
+        headers={'Content-Disposition': 'attachment; filename=reports.zip'}
     )
 
 @app.route('/admin/office', methods=['GET', 'POST'])
@@ -742,6 +772,11 @@ def student_dashboard():
     items = []
 
     for inv in inventories:
+        active_borrow = BorrowTracker.query.filter(
+        BorrowTracker.inventory_id == inv.inventory_id,
+        BorrowTracker.status.in_(['approved', 'borrowed', 'overdue'])
+        ).order_by(BorrowTracker.request_date.desc()).first()
+
         items.append({
             'id': inv.inventory_id,
             'name': inv.inventory_nm,
@@ -750,7 +785,8 @@ def student_dashboard():
             'serial': inv.serial_number,
             'condition': inv.inventory_condition,
             'office': inv.office.office_nm if inv.office else 'N/A',
-            'available': inv.is_available
+            'available': inv.is_available,
+            'return_date': active_borrow.return_date.strftime('%b %d, %Y') if active_borrow and active_borrow.return_date else None,
         })
 
     return render_template(
@@ -796,16 +832,92 @@ def student_borrow():
             inventory_id=inventory_item.inventory_id,
             status='pending',
             remarks=form.remarks.data.strip() if form.remarks.data else None,
+            borrow_date=form.borrow_date.data,
+            return_date=form.return_date.data,
+            faculty_incharge=form.faculty_incharge.data.strip() if form.faculty_incharge.data else None,
+            contact_number=form.contact_number.data.strip() if form.contact_number.data else None,
             approved_by=approver_id
         )
 
         db.session.add(borrow_record)
         db.session.commit()
 
-        flash('Borrow request submitted. Waiting for approval.', 'success')
         return redirect(url_for('student_dashboard'))
 
     return render_template('student-borrow.html', form=form, inventory=inventory_item, student=student)
+
+@app.route('/student/borrow/bulk', methods=['GET', 'POST'])
+def student_borrow_bulk():
+    if 'student' not in session:
+        return redirect(url_for('student_information'))
+
+    student = session['student']
+    form = BorrowForm()
+
+    if request.method == 'POST':
+        inventory_ids = request.form.getlist('inventory_ids')
+        faculty_incharge = request.form.get('faculty_incharge', '').strip()
+        borrow_date = request.form.get('borrow_date')
+        return_date = request.form.get('return_date')
+        remarks = request.form.get('remarks', '').strip()
+
+        borrow_date_obj = datetime.strptime(borrow_date, '%Y-%m-%d').date() if borrow_date else None
+        return_date_obj = datetime.strptime(return_date, '%Y-%m-%d').date() if return_date else None
+
+        borrowed = []
+        skipped = []
+
+        for inv_id in inventory_ids:
+            inventory_item = Inventory.query.get(inv_id)
+            if not inventory_item or not inventory_item.is_available:
+                skipped.append(inv_id)
+                continue
+
+            approver_id = None
+            if inventory_item.office and inventory_item.office.approver_config:
+                approver_id = inventory_item.office.approver_config.faculty_id
+
+            borrow_record = BorrowTracker(
+                student_id=student['id'],
+                inventory_id=inventory_item.inventory_id,
+                status='pending',
+                remarks=remarks or None,
+                approved_by=approver_id,
+                faculty_incharge=faculty_incharge or None,
+                contact_number=form.contact_number.data.strip() if form.contact_number.data else None,
+                borrow_date=borrow_date_obj,
+                return_date=return_date_obj
+            )
+            db.session.add(borrow_record)
+            borrowed.append(inventory_item.inventory_nm)
+
+        db.session.commit()
+
+        if borrowed:
+            flash(f'Borrow requests submitted for: {", ".join(borrowed)}.', 'success')
+        if skipped:
+            flash(f'{len(skipped)} item(s) were skipped (unavailable).', 'warning')
+
+        return redirect(url_for('student_dashboard'))
+
+    # GET — receive inventory_ids from cart via query string
+    inventory_ids = request.args.getlist('inventory_ids')
+    inventories = Inventory.query.filter(Inventory.inventory_id.in_(inventory_ids), Inventory.is_available == True).all()
+
+    if not inventories:
+        flash('No available items to borrow.', 'warning')
+        return redirect(url_for('student_cart'))
+
+    return render_template('student-borrow-bulk.html', inventories=inventories, student=student, form=form)
+
+@app.route('/student/cart', methods=['GET', 'POST'])
+def student_cart():
+    if 'student' not in session:
+        return redirect(url_for('student_information'))
+
+    student = session['student']
+    
+    return render_template('student-cart.html', student=student)
 
 @app.route('/student/logout')
 def student_logout():

@@ -26,6 +26,7 @@
                     <th>Requested Item</th>
                     <th>Request Date</th>
                     <th>Status</th>
+                    <th>Faculty In Charge</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -48,11 +49,14 @@
                             <span class="badge rejected">Rejected</span>
                         {% endif %}
                     </td>
+                    <td>{{ req.faculty_incharge or 'N/A' }}</td>
                     <td>
                         {% if req.status == 'pending' %}
-                        <button class="action-btn approve" onclick="openModal('approve', {{ req.borrow_id }})">Approve</button>
-                        <button class="action-btn reject" onclick="openModal('reject', {{ req.borrow_id }})">Reject</button>
+                        <button class="action-btn" onclick="openDetailsModal({{ req.borrow_id }}, '{{ req.borrow_date or 'N/A' }}', '{{ req.return_date or 'N/A' }}', '{{ req.remarks or 'N/A' }}', '{{ req.contact_number or 'N/A' }}')">Details</button>
+                        <button class="action-btn approve" onclick="openModal('approve', {{ req.borrow_id }}, '{{ req.borrow_date or '' }}', '{{ req.return_date or '' }}')">Approve</button>
+                        <button class="action-btn reject" onclick="openModal('reject', {{ req.borrow_id }}, '', '')">Reject</button>
                         {% else %}
+                        <button class="action-btn" onclick="openDetailsModal({{ req.borrow_id }}, '{{ req.borrow_date or 'N/A' }}', '{{ req.return_date or 'N/A' }}', '{{ req.remarks or 'N/A' }}', '{{ req.contact_number or 'N/A' }}')">Details</button>
                         <button class="action-btn" disabled>Processed</button>
                         {% endif %}
                     </td>
@@ -102,8 +106,40 @@
             </form>
         </div>
     </div>
+    <!-- Details Modal -->
+    <div id="detailsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#1a2e1a; padding:2rem; border-radius:12px; width:400px; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);">
+            <h3 style="margin-bottom:1.5rem; color:white;"><i class="fa-solid fa-circle-info"></i> Request Details</h3>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Date to Borrow</label>
+                <p id="detailBorrowDate" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Expected Return Date</label>
+                <p id="detailReturnDate" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Remarks</label>
+                <p id="detailRemarks" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:0.75rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.6);">Contact Number</label>
+                <p id="detailContact" style="color:white; font-weight:500;"></p>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end;">
+                <button onclick="closeDetailsModal()"
+                    style="padding:0.5rem 1.25rem; border-radius:20px; border:1px solid rgba(255,255,255,0.3); background:transparent; color:white; cursor:pointer;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
 <script>
-    function openModal(action, borrowId) {
+    function openModal(action, borrowId, borrowDate, returnDate) {
     const modal = document.getElementById('remarkModal');
     const title = document.getElementById('modalTitle');
     const submitBtn = document.getElementById('modalSubmitBtn');
@@ -119,6 +155,10 @@
         form.action = `/admin/requests/approve/${borrowId}`;
         borrowDateField.style.display = 'block';
         returnDateField.style.display = 'block';
+
+        // Pre-fill dates from the student's request
+        if (borrowDate) borrowDateField.querySelector('input').value = borrowDate;
+        if (returnDate) returnDateField.querySelector('input').value = returnDate;
     } else {
         title.textContent = 'Reject Request';
         submitBtn.style.background = '#c0392b';
@@ -137,6 +177,23 @@ function closeModal() {
     document.getElementById('borrowDateField').style.display = 'none';
     document.getElementById('returnDateField').style.display = 'none';
 }
+
+function openDetailsModal(borrowId, borrowDate, returnDate, remarks, contact) {
+    document.getElementById('detailBorrowDate').textContent = borrowDate;
+    document.getElementById('detailReturnDate').textContent = returnDate;
+    document.getElementById('detailRemarks').textContent = remarks;
+    document.getElementById('detailContact').textContent = contact;
+    document.getElementById('detailsModal').style.display = 'flex';
+}
+
+function closeDetailsModal() {
+    document.getElementById('detailsModal').style.display = 'none';
+}
+
+// Close on backdrop click
+document.getElementById('detailsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDetailsModal();
+});
 </script>
 
 </main>

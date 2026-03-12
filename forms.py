@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, SubmitField, IntegerField, SelectField
+from wtforms import StringField, PasswordField, SubmitField, IntegerField, SelectField, DateField
 from wtforms.validators import DataRequired, Length, Regexp, NumberRange, Optional
 
 class StudentForm(FlaskForm):
@@ -12,7 +12,7 @@ class StudentForm(FlaskForm):
     )
     name = StringField('Name', validators=[DataRequired(), Length(min=1, max=100)])
     course = StringField('Course', validators=[DataRequired(), Length(min=1, max=50)])
-    year = StringField('Year', validators=[DataRequired(), Length(min=1, max=20)])
+    year = StringField('Year Level', validators=[DataRequired(), Length(min=1, max=20)])
     submit = SubmitField('Submit')
 
 class StudentFollowUpForm(FlaskForm):
@@ -52,6 +52,28 @@ class BorrowForm(FlaskForm):
         'Inventory ID',
         validators=[DataRequired()]
     )
+
+    borrow_date = DateField(
+        'Borrow Date',
+        validators=[DataRequired()],
+        format='%Y-%m-%d'
+    )
+
+    return_date = DateField(
+        'Expected Return Date',
+        validators=[DataRequired()],
+        format='%Y-%m-%d'
+    )
+
+    faculty_incharge = StringField(
+        'Faculty In Charge',
+        validators=[DataRequired(), Length(max=100)]
+    )
+    contact_number = StringField('Contact Number', validators=[
+    DataRequired(),
+    Length(min=11, max=11, message='Contact number must be exactly 11 digits'),
+    Regexp(r'^\d{11}$', message='Contact number must contain only digits')
+    ])
 
     remarks = StringField(
         'Remarks',

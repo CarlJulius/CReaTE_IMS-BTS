@@ -213,6 +213,25 @@ No inventory item selected.
 {% endif %}
 
 </div>
+<div class="form-group">
+    <label>Date to Borrow</label>
+    {{ form.borrow_date(class="form-control") }}
+</div>
+
+<div class="form-group">
+    <label>Expected Return Date</label>
+    {{ form.return_date(class="form-control") }}
+</div>
+<div class="form-group">
+    <label for="faculty_incharge">Faculty In Charge</label>
+    {{ form.faculty_incharge(class="form-control", placeholder="Enter the name of the faculty in charge") }}
+</div>
+<div class="form-group">
+    <label>Contact Number</label>
+    <input type="text" name="contact_number" maxlength="11" 
+        placeholder="09XXXXXXXXX" required
+        oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+</div>
 
 
 <button type="submit" class="submit-btn">
