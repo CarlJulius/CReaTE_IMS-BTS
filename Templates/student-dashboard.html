@@ -8,6 +8,16 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
 </head>
 <body>
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+          {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">
+              {{ message }}
+          </div>
+          {% endfor %}
+      {% endif %}
+  {% endwith %}
 
 <!-- NAV -->
 <nav>

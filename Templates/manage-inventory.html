@@ -51,6 +51,10 @@
                     <input id="item-category" name="category" class="input-field" />
                 </div>
                 <div class="form-row">
+                    {{ add_form.itemkind.label }}
+                    <input id="item-itemkind" name="itemkind" class="input-field" placeholder="e.g. Laptop, Projector..." />
+                </div>
+                <div class="form-row">
                     {{ add_form.office.label }}
                     <select id="item-office" name="office" class="input-field">
                         {% for o in office_list %}
@@ -132,24 +136,28 @@
                     <td>{{ it.condition }}</td>
                     <td>{{ it.office }}</td>
                     <td>
-                        <button class="action-btn details-btn" 
-                            onclick="openDetailsModal('{{ it.name }}', '{{ it.desc or 'N/A' }}', '{{ it.condition }}', '{{ it.serial }}', '{{ it.category }}', '{{ it.office }}')"
-                            title="Details">
-                            Details
-                        </button>
-                        <button class="icon-btn edit-btn" 
-                            data-id="{{ it.id }}"
-                            data-name="{{ it.name }}"
-                            data-desc="{{ it.desc }}"
-                            data-condition="{{ it.condition }}"
-                            data-serial="{{ it.serial }}"
-                            data-category="{{ it.category }}"
-                            data-office="{{ it.office }}"
-                        ><i class="fa-solid fa-pen-to-square"></i></button>
-                        <form method="post" action="{{ url_for('delete_inventory', item_id=it.id) }}" style="display:inline;">
-                            {{ add_form.csrf_token }}
-                            <button class="icon-btn delete-btn" type="submit"><i class="fa-solid fa-trash"></i></button>
-                        </form>
+                        <div class="action-group">
+                            <button class="action-btn details-btn" 
+                                onclick="openDetailsModal('{{ it.name }}', '{{ it.desc or 'N/A' }}', '{{ it.condition }}', '{{ it.serial }}', '{{ it.category }}', '{{ it.office }}')"
+                                title="Details">
+                                Details
+                            </button>
+                            <button class="icon-btn edit-btn" 
+                                data-id="{{ it.id }}"
+                                data-name="{{ it.name }}"
+                                data-desc="{{ it.desc }}"
+                                data-condition="{{ it.condition }}"
+                                data-serial="{{ it.serial }}"
+                                data-category="{{ it.category }}"
+                                data-itemkind="{{ it.itemkind or '' }}"
+                                data-office="{{ it.office }}"
+                                title="Edit"
+                            ><i class="fa-solid fa-pen-to-square"></i></button>
+                            <form method="post" action="{{ url_for('delete_inventory', item_id=it.id) }}" style="display:contents;">
+                                {{ add_form.csrf_token }}
+                                <button class="icon-btn delete-btn" type="submit" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        </div>
                     </td>
                
                 {% else %}
@@ -170,6 +178,98 @@
         .input-field { width:100%; padding:8px; color:#000; background:#fff; border:1px solid #ccc; border-radius:4px; }
         .modal label { display:block; margin-bottom:6px; font-weight:600; color:#111; }
         .table-container { position:relative; z-index:1; }
+
+        /* ── Mobile only: stack action buttons vertically like the screenshot ── */
+        @media (max-width: 768px) {
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .page-header .action-btn.add-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .controls-container form {
+                flex-direction: column;
+                width: 100%;
+            }
+            .controls-container .search-box { width: 100%; }
+            .controls-container .action-btn[type="submit"] {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .table-container { overflow-x: auto; }
+            table { min-width: 420px; }
+
+            /* Stack buttons in a vertical column */
+            .action-group {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 5px;
+                min-width: 100px;
+            }
+
+            /* Details button — white-ish, matches screenshot */
+            .action-btn.details-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 6px 10px;
+                font-size: 12px;
+                border-radius: 6px;
+                border: 1px solid rgba(255,255,255,0.5);
+                background: rgba(255,255,255,0.92);
+                color: #111;
+                white-space: nowrap;
+                cursor: pointer;
+                width: 100%;
+                transition: background 0.2s;
+            }
+            .action-btn.details-btn:hover { background: rgba(255,255,255,1); }
+
+            /* Edit icon btn — green tint, full width */
+            .icon-btn.edit-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 30px;
+                border-radius: 6px;
+                border: 1px solid rgba(40,167,69,0.6);
+                background: rgba(40,167,69,0.25);
+                color: #4ade80;
+                font-size: 13px;
+                cursor: pointer;
+                flex-shrink: 0;
+                transition: background 0.2s;
+            }
+            .icon-btn.edit-btn:hover { background: rgba(40,167,69,0.45); }
+
+            /* Delete icon btn — red tint, full width */
+            .icon-btn.delete-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 30px;
+                border-radius: 6px;
+                border: 1px solid rgba(220,53,69,0.6);
+                background: rgba(220,53,69,0.25);
+                color: #f87171;
+                font-size: 13px;
+                cursor: pointer;
+                flex-shrink: 0;
+                transition: background 0.2s;
+            }
+            .icon-btn.delete-btn:hover { background: rgba(220,53,69,0.45); }
+
+            .modal-content { width: 92% !important; margin: 0 auto; }
+        }
     </style>
 
     <!-- JS -->

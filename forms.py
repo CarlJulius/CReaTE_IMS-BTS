@@ -95,6 +95,7 @@ class InventoryForm(FlaskForm):
     serial = StringField('Serial Number', validators=[DataRequired(), Length(min=1, max=100)])
     category = StringField('Category', validators=[DataRequired(), Length(min=1, max=100)])
     office = StringField('Office', validators=[DataRequired(), Length(min=1, max=100)])
+    itemkind = StringField('Equipment Group', validators=[Optional(), Length(min=1, max=100)])
     submit = SubmitField('Add Item')
 
 

@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response
-from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory, EquipmentApprover, Reports
+from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory, EquipmentApprover, Reports, Itemkind
 from sqlalchemy import func, or_
 from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm, StudentFollowUpForm
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from functools import wraps
 from dotenv import load_dotenv
 import os
@@ -135,11 +135,27 @@ def edit_profile():
     return redirect(request.referrer or url_for('admin_dashboard'))
 
 #########################Admin dashboard and management pages#########################
+#helper function to check for overdue items and update their status
+def check_overdue():
+    today = date.today()
+    # Update status to 'overdue' for items past return date and still not returned
+    BorrowTracker.query.filter( BorrowTracker.status.in_(['approved', 'borrowed']),
+                               BorrowTracker.return_date < today).update({'status': 'overdue'}, 
+                               synchronize_session=False)
+    
+    # items not available when borrow date is today
+    due_today = BorrowTracker.query.filter( BorrowTracker.status.in_(['approved', 'borrowed']),
+                                            BorrowTracker.borrow_date <= today
+                                            ).all()
+    for record in due_today:
+        record.inventory.is_available = False
+    
+    db.session.commit()
 
 @app.route('/admin/dashboard', methods=['GET', 'POST'])
 @admin_required
 def admin_dashboard():
-    from sqlalchemy.orm import joinedload
+    check_overdue()  # Ensure overdue items are updated before showing dashboard stats
 
     total_items = Inventory.query.count()
     pending_count = BorrowTracker.query.filter_by(status='pending').count()
@@ -229,6 +245,7 @@ def mark_returned(borrow_id):
 def inventory():
     add_form = InventoryForm()
     office_list = Office.query.all()
+    itemkind_list = Itemkind.query.all()
 
     if add_form.validate_on_submit():
         cat_name = add_form.category.data.strip()
@@ -244,13 +261,23 @@ def inventory():
             db.session.add(office)
             db.session.commit()
 
+        itemkind_nm = add_form.itemkind.data.strip() if add_form.itemkind.data else None
+        itemkind = None
+        if itemkind_nm:
+            itemkind = Itemkind.query.filter_by(itemkind_nm=itemkind_nm).first()
+            if not itemkind:
+                itemkind = Itemkind(itemkind_nm=itemkind_nm)
+                db.session.add(itemkind)
+                db.session.commit()
+
         new_inv = Inventory(
             inventory_nm=add_form.name.data.strip(),
             inventory_desc=add_form.desc.data.strip() if add_form.desc.data else None,
             inventory_condition=add_form.condition.data.strip(),
             serial_number=add_form.serial.data.strip(),
             office_id=office.office_id,
-            category_id=category.category_id
+            category_id=category.category_id,
+            itemkind_id=itemkind.itemkind_id if itemkind else None
         )
 
         db.session.add(new_inv)
@@ -284,10 +311,17 @@ def inventory():
             'condition': inv.inventory_condition,
             'serial': inv.serial_number,
             'available': inv.is_available,
-            'status': 'Available' if inv.is_available else 'Borrowed'
+            'status': 'Available' if inv.is_available else 'Borrowed',
+            'itemkind_id': inv.itemkind_id or '',
+            'itemkind': next((k.itemkind_nm for k in itemkind_list if k.itemkind_id == inv.itemkind_id), 'N/A')
         })
 
-    return render_template('manage-inventory.html', items=items, add_form=add_form, q=q, office_list=office_list)
+    return render_template('manage-inventory.html',
+                            items=items,
+                            add_form=add_form,
+                            q=q, 
+                            office_list=office_list, 
+                            itemkind_list=itemkind_list)
 
 @app.route('/admin/inventory/edit/<int:item_id>', methods=['POST'])
 @admin_required
@@ -308,6 +342,19 @@ def edit_inventory(item_id):
             db.session.commit()
         inv.category_id = category.category_id
         inv.office_id = form.office.data
+
+        # Handle itemkind
+        itemkind_nm = form.itemkind.data.strip() if form.itemkind.data else None
+        if itemkind_nm:
+            itemkind = Itemkind.query.filter_by(itemkind_nm=itemkind_nm).first()
+            if not itemkind:
+                itemkind = Itemkind(itemkind_nm=itemkind_nm)
+                db.session.add(itemkind)
+                db.session.commit()
+            inv.itemkind_id = itemkind.itemkind_id
+        else:
+            inv.itemkind_id = None
+
         db.session.commit()
         flash('Inventory item updated.', 'success')
     else:
@@ -326,6 +373,8 @@ def delete_inventory(item_id):
     return redirect(url_for('inventory'))
 
 from sqlalchemy.orm import joinedload
+
+
 
 @app.route('/admin/requests')
 @admin_required
@@ -384,7 +433,11 @@ def approve_request(borrow_id):
     if return_date:
         borrow.return_date = datetime.strptime(return_date, '%Y-%m-%d').date()
 
-    borrow.inventory.is_available = False
+    # Only mark unavailable if borrow date is today or already passed
+    today = date.today()
+    if borrow.borrow_date and borrow.borrow_date <= today:
+        borrow.inventory.is_available = False
+
     db.session.commit()
     flash('Request approved.', 'success')
     return redirect(url_for('requests'))
@@ -441,6 +494,18 @@ def reports():
     for d in daily_counts:
         d['height'] = int((d['count'] / max_count) * 100) if max_count > 0 else 0
 
+    # Equipment quantity summary
+    itemkind_summary = []
+    for kind in Itemkind.query.all():
+        total = Inventory.query.filter_by(itemkind_id=kind.itemkind_id).count()
+        available = Inventory.query.filter_by(itemkind_id=kind.itemkind_id, is_available=True).count()
+        itemkind_summary.append({
+            'name': kind.itemkind_nm,
+            'total': total,
+            'available': available,
+            'borrowed': total - available
+        })
+
     return render_template(
         'reports.html',
         total_borrows=total_borrows,
@@ -448,7 +513,8 @@ def reports():
         damage_reports=damage_reports,
         daily_counts=daily_counts,
         date_from=date_from,
-        date_to=date_to
+        date_to=date_to,
+        itemkind_summary=itemkind_summary
     )
 
 
@@ -456,10 +522,10 @@ def reports():
 @app.route('/admin/reports/export')
 @admin_required
 def export_csv():
-    # Borrow records CSV
+    # ── Borrow Records CSV ──
     borrow_output = io.StringIO()
     borrow_writer = csv.writer(borrow_output)
-    borrow_writer.writerow(['Borrow ID', 'Student Name', 'Student Number', 'Faculty In Charge', 'Item', 'Status', 'Request Date', 'Borrow Date', 'Return Date', 'Remarks'])
+    borrow_writer.writerow(['Borrow ID', 'Student Name', 'Student Number', 'Faculty In Charge', 'Contact Number', 'Item', 'Status', 'Request Date', 'Borrow Date', 'Return Date', 'Remarks'])
 
     records = BorrowTracker.query.options(
         joinedload(BorrowTracker.student),
@@ -472,6 +538,7 @@ def export_csv():
             r.student.student_nm if r.student else 'N/A',
             r.student.student_number if r.student else 'N/A',
             r.faculty_incharge or 'N/A',
+            r.contact_number or 'N/A',
             r.inventory.inventory_nm if r.inventory else 'N/A',
             r.status,
             r.request_date.strftime('%Y-%m-%d') if r.request_date else '',
@@ -480,18 +547,17 @@ def export_csv():
             r.remarks or ''
         ])
 
-    # Inventory CSV
+    # ── Inventory CSV ──
     inventory_output = io.StringIO()
     inventory_writer = csv.writer(inventory_output)
-    inventory_writer.writerow(['Inventory ID', 'Name', 'Category', 'Description', 'Office', 'Condition', 'Serial Number', 'Status'])
+    inventory_writer.writerow(['Inventory ID', 'Name', 'Category', 'Equipment Group', 'Description', 'Office', 'Condition', 'Serial Number', 'Status'])
 
-    inventories = Inventory.query.all()
-
-    for inv in inventories:
+    for inv in Inventory.query.all():
         inventory_writer.writerow([
             inv.inventory_id,
             inv.inventory_nm,
             inv.category.category_nm if inv.category else 'N/A',
+            inv.itemkind.itemkind_nm if inv.itemkind else 'N/A',
             inv.inventory_desc or '',
             inv.office.office_nm if inv.office else 'N/A',
             inv.inventory_condition,
@@ -499,11 +565,27 @@ def export_csv():
             'Available' if inv.is_available else 'Borrowed'
         ])
 
-    # Zip both CSVs
+    # ── Equipment Quantity CSV ──
+    itemkind_output = io.StringIO()
+    itemkind_writer = csv.writer(itemkind_output)
+    itemkind_writer.writerow(['Equipment Group', 'Total Units', 'Available', 'Borrowed'])
+
+    for kind in Itemkind.query.all():
+        total = Inventory.query.filter_by(itemkind_id=kind.itemkind_id).count()
+        available = Inventory.query.filter_by(itemkind_id=kind.itemkind_id, is_available=True).count()
+        itemkind_writer.writerow([
+            kind.itemkind_nm,
+            total,
+            available,
+            total - available
+        ])
+
+    # ── Zip all three ──
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         zip_file.writestr('borrow_records.csv', borrow_output.getvalue())
         zip_file.writestr('inventory.csv', inventory_output.getvalue())
+        zip_file.writestr('equipment_quantity.csv', itemkind_output.getvalue())
 
     zip_buffer.seek(0)
     return Response(
