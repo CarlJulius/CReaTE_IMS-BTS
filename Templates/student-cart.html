@@ -326,14 +326,13 @@
   }
 
   // Borrow all available items: clear entire cart, go to borrow page of first available
-  function borrowAll() {
+function borrowAll() {
     const cart = getCart();
-    const available = cart.filter(i => i.available);
-    if (available.length === 0) {
-        showToast('⚠️', 'No available items to borrow');
+    if (cart.length === 0) {
+        showToast('⚠️', 'Your cart is empty');
         return;
     }
-    const params = available.map(i => 'inventory_ids=' + i.id).join('&');
+    const params = cart.map(i => 'inventory_ids=' + i.id).join('&');
     window.location.href = '/student/borrow/bulk?' + params;
 }
 
@@ -375,9 +374,7 @@
 
     let rows = '';
     cart.forEach(function(item) {
-      const actionBtn = item.available
-        ? '<button class="c-borrow-btn" onclick="borrowItem(' + item.id + ')">📦 Borrow Now</button>'
-        : '<span class="c-borrow-btn off">⏳ Unavailable</span>';
+      const actionBtn = '<button class="c-borrow-btn" onclick="borrowItem(' + item.id + ')">📦 Borrow Now</button>'
 
       rows +=
         '<tr>' +
@@ -387,7 +384,7 @@
           '</td>' +
           '<td>' +
             '<span class="c-avail-badge ' + (item.available ? 'yes' : 'no') + '">' +
-              (item.available ? 'Available' : 'Unavailable') +
+              (item.available ? 'Available' : 'Unavailable Today') +
             '</span>' +
           '</td>' +
           '<td>' + actionBtn + '</td>' +
@@ -399,9 +396,9 @@
       ? ' &nbsp;·&nbsp; <span style="color:var(--success);font-weight:600;">' + availableCount + ' available</span>'
       : '';
 
-    const borrowAllBtn = availableCount > 0
-      ? '<button class="c-borrow-all-btn" onclick="borrowAll()">📦 Borrow All (' + availableCount + ')</button>'
-      : '';
+    const borrowAllBtn = cart.length > 0
+    ? '<button class="c-borrow-all-btn" onclick="borrowAll()">📦 Borrow All (' + cart.length + ')</button>'
+    : '';
 
     wrap.innerHTML =
       '<div class="cart-table-wrap">' +

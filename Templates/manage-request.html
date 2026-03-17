@@ -110,7 +110,13 @@
                                             <td style="padding:12px 15px;">
                                                 {% if item_req.status == 'pending' %}
                                                 <button class="action-btn" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.15);font-size:12px;"
-                                                    onclick="openDetailsModal({{ item_req.borrow_id }}, '{{ item_req.borrow_date or 'N/A' }}', '{{ item_req.return_date or 'N/A' }}', '{{ item_req.remarks or 'N/A' }}', '{{ item_req.contact_number or 'N/A' }}')">
+                                                    data-borrow-id="{{ item_req.borrow_id }}"
+                                                    data-borrow-date="{{ item_req.borrow_date or 'N/A' }}"
+                                                    data-return-date="{{ item_req.return_date or 'N/A' }}"
+                                                    data-remarks="{{ item_req.remarks or 'N/A' }}"
+                                                    data-contact="{{ item_req.contact_number or 'N/A' }}"
+                                                    data-inventory-id="{{ item_req.inventory_id }}"
+                                                    onclick="openDetailsModalFromBtn(this)">
                                                     <i class="fa-solid fa-circle-info"></i> Details
                                                 </button>
                                                 <button class="action-btn approve" style="font-size:12px;"
@@ -205,6 +211,23 @@
                 <label style="font-size:12px; color:rgba(255,255,255,0.6);">Contact Number</label>
                 <p id="detailContact" style="color:white; font-weight:500;"></p>
             </div>
+            <!--Calendar-->
+            <div class="cal-section" style="margin-bottom:1.5rem;">
+                <div class="cal-section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    Borrowing Schedule
+                </div>
+                <div class="cal-legend">
+                    <span class="cal-legend-item"><span class="cal-dot pending"></span>Pending Request</span>
+                    <span class="cal-legend-item"><span class="cal-dot approved"></span>Approved / Borrowed</span>
+                </div>
+                <div class="cal-nav">
+                    <button class="cal-nav-btn" onclick="shiftMonth(-1)">&#8249;</button>
+                    <span class="cal-month-label" id="calMonthLabel"></span>
+                    <button class="cal-nav-btn" onclick="shiftMonth(1)">&#8250;</button>
+                </div>
+                <div class="cal-grid" id="calGrid"></div>
+            </div>
 
             <div style="display:flex; justify-content:flex-end;">
                 <button onclick="closeDetailsModal()"
@@ -290,6 +313,84 @@
     document.querySelectorAll('.student-items-row').forEach(function(row) {
         row.addEventListener('click', function(e) { e.stopPropagation(); });
     });
+    /*Calendar*/
+    let calViewYear = new Date().getFullYear();
+    let calViewMonth = new Date().getMonth();
+    let currentItemBookings = [];
+
+    async function fetchItemBookings(itemId) {
+        try {
+            const res = await fetch(`/student/item/${itemId}/bookings`);
+            if (res.ok) {
+                const data = await res.json();
+                return data.bookings;
+            }
+        } catch (_) {}
+        return [];
+    }
+
+    function renderCalendar() {
+        const label = document.getElementById('calMonthLabel');
+        const grid = document.getElementById('calGrid');
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        label.textContent = `${monthNames[calViewMonth]} ${calViewYear}`;
+
+        const bookingMap = {};
+        currentItemBookings.forEach(b => { bookingMap[b.date] = b.status; });
+
+        const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+        const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+        let html = '';
+        ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => {
+            html += `<div class="cal-day-header">${d}</div>`;
+        });
+        for (let i = 0; i < firstDay; i++) html += `<div class="cal-cell empty"></div>`;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const status = bookingMap[dateStr];
+            let cls = 'cal-cell';
+            if (dateStr === todayStr) cls += ' today';
+            if (status === 'pending') cls += ' cal-pending';
+            if (status === 'approved') cls += ' cal-approved';
+            const tip = status === 'pending' ? 'Pending request' : status === 'approved' ? 'Approved / Borrowed' : '';
+            html += `<div class="${cls}" title="${tip}">${d}${status ? `<span class="cal-indicator ${status}"></span>` : ''}</div>`;
+        }
+        grid.innerHTML = html;
+    }
+
+    function shiftMonth(dir) {
+        calViewMonth += dir;
+        if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+        if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+        renderCalendar();
+    }
+
+    function openDetailsModalFromBtn(btn) {
+        const borrowDate  = btn.dataset.borrowDate;
+        const returnDate  = btn.dataset.returnDate;
+        const remarks     = btn.dataset.remarks;
+        const contact     = btn.dataset.contact;
+        const inventoryId = btn.dataset.inventoryId;
+        openDetailsModal(borrowDate, returnDate, remarks, contact, inventoryId);
+    }
+
+    async function openDetailsModal(borrowDate, returnDate, remarks, contact, inventoryId) {
+        document.getElementById('detailBorrowDate').textContent = borrowDate;
+        document.getElementById('detailReturnDate').textContent = returnDate;
+        document.getElementById('detailRemarks').textContent    = remarks;
+        document.getElementById('detailContact').textContent    = contact;
+
+        const now = new Date();
+        calViewYear = now.getFullYear();
+        calViewMonth = now.getMonth();
+        currentItemBookings = await fetchItemBookings(inventoryId);
+        renderCalendar();
+
+        document.getElementById('detailsModal').style.display = 'flex';
+    }
 </script>
 
 </main>

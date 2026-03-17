@@ -99,33 +99,37 @@
                 </div>
             </div>
 
-            <!-- Rejected -->
+            <!-- OverDue -->
             <div class="table-container">
-                <h2><i class="fa-solid fa-circle-xmark" style="color:#f87171;"></i> Rejected</h2>
+                <h2><i class="fa-solid fa-circle-xmark" style="color:#f87171;"></i> OverDue</h2>
                 <div style="max-height:220px; overflow-y:auto;">
                     <table>
                         <thead>
                             <tr>
                                 <th>Student</th>
                                 <th>Item</th>
-                                <th>Date</th>
+                                <th>Return Date</th>
+                                <th>Student Contact</th>
                                 <th>Remarks</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% set rejected = recent_activities|selectattr('status', 'equalto', 'rejected')|list %}
-                            {% for req in rejected %}
+                            {% set overdue = recent_activities|selectattr('status', 'equalto', 'overdue')|list %}
+                            {% for req in overdue %}
                             <tr>
                                 <td>
                                     <strong>{{ req.student.student_nm }}</strong><br>
                                     <span style="font-size:11px; opacity:0.6;">{{ req.student.student_number }}</span>
                                 </td>
                                 <td>{{ req.inventory.inventory_nm }}</td>
-                                <td>{{ req.request_date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ req.return_date.strftime('%Y-%m-%d') if req.return_date else 'N/A' }}</td>
+                                <td>{{ req.contact_number}}</td>
                                 <td>{{ req.remarks or '—' }}</td>
+                                <td><a href="{{ url_for('borrowed_items') }}" class="action-btn approve" style="font-size:11px; padding:4px 8px;">Manage</a></td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="4">No rejected requests.</td></tr>
+                            <tr><td colspan="4">No Overdue Items.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>

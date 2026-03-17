@@ -109,7 +109,7 @@
     <div class="page-header">
         <h2>Check My Requests</h2>
     </div>
-
+    
     <div class="controls-container" style="margin-bottom:1.5rem;">
         <form method="post" action="{{ url_for('student_requests') }}" style="display:flex; gap:8px; align-items:center;">
             <div class="search-box">
@@ -178,6 +178,10 @@
             <p style="color:#ef4444; font-weight: bold;">No student found with that ID number.</p>
         {% endif %}
     {% endif %}
+
+    <div class="action btn">
+        <a href="{{url_for('student_information')}}"><button class="action btn">Back</button></a>
+    </div>
 
     </main>
 </body>

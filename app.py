@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, Response
 from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory, EquipmentApprover, Reports, Itemkind
 from sqlalchemy import func, or_
+from sqlalchemy.orm import joinedload, contains_eager
 from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm, StudentFollowUpForm
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone, timedelta, date
 from functools import wraps
 from dotenv import load_dotenv
+from flask_caching import Cache
 import os
 import io
 import csv
@@ -18,6 +20,8 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache', 'CACHE_DEFAULT_TIMEOUT': 300})
 
 db.init_app(app)
 
@@ -196,7 +200,6 @@ def admin_dashboard():
 @app.route('/admin/borrowed-items', methods=['GET', 'POST'])
 @admin_required
 def borrowed_items():
-    from sqlalchemy.orm import joinedload, contains_eager
 
     q = request.args.get('q', '').strip()
 
@@ -237,6 +240,7 @@ def mark_returned(borrow_id):
     borrow.status = 'returned'
     borrow.inventory.is_available = True
     db.session.commit()
+    cache.clear()
     flash('Item marked as returned.', 'success')
     return redirect(url_for('borrowed_items'))
 
@@ -282,6 +286,7 @@ def inventory():
 
         db.session.add(new_inv)
         db.session.commit()
+        cache.clear()
         flash('Inventory item added.', 'success')
         return redirect(url_for('inventory'))
 
@@ -356,6 +361,7 @@ def edit_inventory(item_id):
             inv.itemkind_id = None
 
         db.session.commit()
+        cache.clear()
         flash('Inventory item updated.', 'success')
     else:
         flash('Failed to update item.', 'danger')
@@ -369,10 +375,9 @@ def delete_inventory(item_id):
     BorrowTracker.query.filter_by(inventory_id=inv.inventory_id).delete()
     db.session.delete(inv)
     db.session.commit()
+    cache.clear()
     flash('Inventory item deleted.', 'success')
     return redirect(url_for('inventory'))
-
-from sqlalchemy.orm import joinedload
 
 
 
@@ -439,6 +444,7 @@ def approve_request(borrow_id):
         borrow.inventory.is_available = False
 
     db.session.commit()
+    cache.clear()
     flash('Request approved.', 'success')
     return redirect(url_for('requests'))
 
@@ -453,11 +459,13 @@ def reject_request(borrow_id):
     borrow.status = 'rejected'
     borrow.remarks = request.form.get('remarks', '').strip() or borrow.remarks
     db.session.commit()
+    cache.clear()
     flash('Request rejected.', 'info')
     return redirect(url_for('requests'))
 
 @app.route('/admin/reports', methods=['GET', 'POST'])
 @admin_required
+@cache.cached(timeout=300, query_string=True)
 def reports():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
@@ -607,6 +615,7 @@ def office():
         )
         db.session.add(new_office)
         db.session.commit()
+        cache.clear()
         flash('Office added.', 'success')
         return redirect(url_for('office'))
 
@@ -633,6 +642,7 @@ def edit_office(office_id):
         off.office_nm = form.name.data.strip()
         off.office_loc = form.location.data.strip()
         db.session.commit()
+        cache.clear()
         flash('Office updated.', 'success')
     else:
         flash('Failed to update office.', 'danger')
@@ -650,6 +660,7 @@ def delete_office(office_id):
 
     db.session.delete(off)
     db.session.commit()
+    cache.clear()
     flash('Office deleted.', 'success')
     return redirect(url_for('office'))
 
@@ -671,6 +682,7 @@ def assign_office_head(office_id):
 
     try:
         db.session.commit()
+        cache.clear()
         flash("Office head assigned successfully!", "success")
     except Exception as e:
         db.session.rollback()
@@ -704,6 +716,7 @@ def faculty():
         )
         db.session.add(new_faculty)
         db.session.commit()
+        cache.clear()
         flash('Faculty added.', 'success')
         return redirect(url_for('faculty'))
 
@@ -753,6 +766,7 @@ def edit_faculty(faculty_id):
 
         fac.office_id = office.office_id
         db.session.commit()
+        cache.clear()
         flash('Faculty updated.', 'success')
     else:
         flash('Failed to update faculty.', 'danger')
@@ -901,9 +915,9 @@ def student_borrow():
             flash('Inventory not found.', 'danger')
             return render_template('student-borrow.html', form=form, inventory=None, student=student)
 
-        if not inventory_item.is_available:
-            flash('Item is currently unavailable.', 'danger')
-            return redirect(url_for('student_dashboard'))
+       # if not inventory_item.is_available:
+        #    flash('Item is currently unavailable.', 'danger')
+         #   return redirect(url_for('student_dashboard'))
 
         approver_id = None
         if inventory_item.office.approver_config:
@@ -939,6 +953,7 @@ def student_borrow_bulk():
     if request.method == 'POST':
         inventory_ids = request.form.getlist('inventory_ids')
         faculty_incharge = request.form.get('faculty_incharge', '').strip()
+        contact_number = request.form.get('contact_number', '').strip()
         borrow_date = request.form.get('borrow_date')
         return_date = request.form.get('return_date')
         remarks = request.form.get('remarks', '').strip()
@@ -951,7 +966,7 @@ def student_borrow_bulk():
 
         for inv_id in inventory_ids:
             inventory_item = Inventory.query.get(inv_id)
-            if not inventory_item or not inventory_item.is_available:
+            if not inventory_item:
                 skipped.append(inv_id)
                 continue
 
@@ -966,7 +981,7 @@ def student_borrow_bulk():
                 remarks=remarks or None,
                 approved_by=approver_id,
                 faculty_incharge=faculty_incharge or None,
-                contact_number=form.contact_number.data.strip() if form.contact_number.data else None,
+                contact_number=contact_number or None,
                 borrow_date=borrow_date_obj,
                 return_date=return_date_obj
             )
@@ -978,16 +993,18 @@ def student_borrow_bulk():
         if borrowed:
             flash(f'Borrow requests submitted for: {", ".join(borrowed)}.', 'success')
         if skipped:
-            flash(f'{len(skipped)} item(s) were skipped (unavailable).', 'warning')
+            flash(f'{len(skipped)} item(s) were skipped.', 'warning')
 
         return redirect(url_for('student_dashboard'))
 
-    # GET — receive inventory_ids from cart via query string
+    # GET — accept all items
     inventory_ids = request.args.getlist('inventory_ids')
-    inventories = Inventory.query.filter(Inventory.inventory_id.in_(inventory_ids), Inventory.is_available == True).all()
+    inventories = Inventory.query.filter(
+        Inventory.inventory_id.in_(inventory_ids)
+    ).all()
 
     if not inventories:
-        flash('No available items to borrow.', 'warning')
+        flash('No items found.', 'warning')
         return redirect(url_for('student_cart'))
 
     return render_template('student-borrow-bulk.html', inventories=inventories, student=student, form=form)
@@ -1000,6 +1017,32 @@ def student_cart():
     student = session['student']
     
     return render_template('student-cart.html', student=student)
+
+@app.route('/student/item/<int:item_id>/bookings')
+def item_bookings(item_id):
+    bookings = BorrowTracker.query.filter(
+        BorrowTracker.inventory_id == item_id,
+        BorrowTracker.status.in_(['pending', 'approved', 'borrowed', 'overdue'])
+    ).all()
+
+    result = []
+    for b in bookings:
+        if b.borrow_date and b.return_date:
+            # Generate a date entry for each day in the borrow range
+            current = b.borrow_date
+            while current <= b.return_date:
+                result.append({
+                    'date': current.strftime('%Y-%m-%d'),
+                    'status': 'pending' if b.status == 'pending' else 'approved'
+                })
+                current += timedelta(days=1)
+        elif b.borrow_date:
+            result.append({
+                'date': b.borrow_date.strftime('%Y-%m-%d'),
+                'status': 'pending' if b.status == 'pending' else 'approved'
+            })
+
+    return {'bookings': result}, 200
 
 @app.route('/student/logout')
 def student_logout():

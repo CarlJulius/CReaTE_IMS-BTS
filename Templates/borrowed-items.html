@@ -4,6 +4,81 @@
 
 {% block content %}
 <body>
+    <!-- Details Modal -->
+    <div id="detailsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#1a2e1a; padding:2rem; border-radius:12px; width:420px; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);">
+            <h3 style="margin-bottom:1.5rem; color:white;">
+                <i class="fa-solid fa-circle-info"></i> Borrow Details
+            </h3>
+
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Borrow ID</label>
+                <p id="detailBorrowId" style="color:white; font-weight:600; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Student Name</label>
+                <p id="detailStudentNm" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Student Number</label>
+                <p id="detailStudentNo" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Item</label>
+                <p id="detailItem" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Serial Number</label>
+                <p id="detailSerial" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Borrow Date</label>
+                <p id="detailBorrowDate" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Return Date</label>
+                <p id="detailReturnDate" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Faculty In Charge</label>
+                <p id="detailFaculty" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Contact Number</label>
+                <p id="detailContact" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <label style="font-size:12px; color:rgba(255,255,255,0.5); display:block; margin-bottom:4px;">Remarks</label>
+                <p id="detailRemarks" style="color:white; font-weight:500; margin:0;"></p>
+            </div>
+            <!-- Borrowing Calendar -->
+            <div class="cal-section" style="margin-bottom:1.5rem;">
+                <div class="cal-section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    Borrowing Schedule
+                </div>
+                <div class="cal-legend">
+                    <span class="cal-legend-item"><span class="cal-dot pending"></span>Pending Request</span>
+                    <span class="cal-legend-item"><span class="cal-dot approved"></span>Approved / Borrowed</span>
+                </div>
+                <div class="cal-nav">
+                    <button class="cal-nav-btn" onclick="shiftMonth(-1)">&#8249;</button>
+                    <span class="cal-month-label" id="calMonthLabel"></span>
+                    <button class="cal-nav-btn" onclick="shiftMonth(1)">&#8250;</button>
+                </div>
+                <div class="cal-grid" id="calGrid"></div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end;">
+                <button onclick="closeDetailsModal()"
+                    style="padding:0.5rem 1.25rem; border-radius:20px; border:1px solid rgba(255,255,255,0.3); background:transparent; color:white; cursor:pointer;">
+                    Close
+                </button>
+            </div>
+        </div>
+        
+    </div>
+    
     <main class="main-content">
         
         <div class="page-header">
@@ -59,6 +134,10 @@
                             {% endif %}
                         </td>
                         <td>
+                            <button class="action-btn details-btn"
+                                onclick="openDetailsModal('{{ item.borrow_id }}', '{{ item.student.student_nm }}', '{{ item.student.student_number }}', '{{ item.inventory.inventory_nm }}', '{{ item.inventory.serial_number }}', '{{ item.borrow_date.strftime('%Y-%m-%d') if item.borrow_date else 'N/A' }}', '{{ item.return_date.strftime('%Y-%m-%d') if item.return_date else 'N/A' }}', '{{ item.faculty_incharge or 'N/A' }}', '{{ item.contact_number or 'N/A' }}', '{{ item.remarks or 'N/A' }}', {{ item.inventory_id }})">
+                                Details
+                            </button>
                             {% if item.status in ['approved', 'borrowed', 'overdue'] %}
                             <form method="post" action="{{ url_for('mark_returned', borrow_id=item.borrow_id) }}" style="display:inline;">
                                 <button class="action-btn return-btn">
@@ -81,4 +160,113 @@
 
     </main>
 </body>
+<script>
+    function openDetailsModal(borrowId, studentNm, studentNo, item, serial, borrowDate, returnDate, faculty, contact, remarks) {
+        document.getElementById('detailBorrowId').textContent = 'BRW-' + borrowId;
+        document.getElementById('detailStudentNm').textContent = studentNm;
+        document.getElementById('detailStudentNo').textContent = studentNo;
+        document.getElementById('detailItem').textContent = item;
+        document.getElementById('detailSerial').textContent = serial;
+        document.getElementById('detailBorrowDate').textContent = borrowDate;
+        document.getElementById('detailReturnDate').textContent = returnDate;
+        document.getElementById('detailFaculty').textContent = faculty;
+        document.getElementById('detailContact').textContent = contact;
+        document.getElementById('detailRemarks').textContent = remarks;
+        document.getElementById('detailsModal').style.display = 'flex';
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsModal').style.display = 'none';
+    }
+
+    document.getElementById('detailsModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDetailsModal();
+    });
+
+   
+    let calViewYear = new Date().getFullYear();
+    let calViewMonth = new Date().getMonth();
+    let currentItemBookings = [];
+
+    async function fetchItemBookings(itemId) {
+        try {
+            const res = await fetch(`/student/item/${itemId}/bookings`);
+            if (res.ok) {
+                const data = await res.json();
+                return data.bookings;
+            }
+        } catch (_) {}
+        return [];
+    }
+
+    function renderCalendar() {
+        const label = document.getElementById('calMonthLabel');
+        const grid = document.getElementById('calGrid');
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        label.textContent = `${monthNames[calViewMonth]} ${calViewYear}`;
+
+        const bookingMap = {};
+        currentItemBookings.forEach(b => { bookingMap[b.date] = b.status; });
+
+        const firstDay = new Date(calViewYear, calViewMonth, 1).getDay();
+        const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+        let html = '';
+        ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d => {
+            html += `<div class="cal-day-header">${d}</div>`;
+        });
+        for (let i = 0; i < firstDay; i++) html += `<div class="cal-cell empty"></div>`;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${calViewYear}-${String(calViewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const status = bookingMap[dateStr];
+            let cls = 'cal-cell';
+            if (dateStr === todayStr) cls += ' today';
+            if (status === 'pending') cls += ' cal-pending';
+            if (status === 'approved') cls += ' cal-approved';
+            const tip = status === 'pending' ? 'Pending request' : status === 'approved' ? 'Approved / Borrowed' : '';
+            html += `<div class="${cls}" title="${tip}">${d}${status ? `<span class="cal-indicator ${status}"></span>` : ''}</div>`;
+        }
+        grid.innerHTML = html;
+    }
+
+    function shiftMonth(dir) {
+        calViewMonth += dir;
+        if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+        if (calViewMonth < 0)  { calViewMonth = 11; calViewYear--; }
+        renderCalendar();
+    }
+
+    async function openDetailsModal(borrowId, studentNm, studentNo, item, serial, borrowDate, returnDate, faculty, contact, remarks, inventoryId) {
+        document.getElementById('detailBorrowId').textContent = 'BRW-' + borrowId;
+        document.getElementById('detailStudentNm').textContent = studentNm;
+        document.getElementById('detailStudentNo').textContent = studentNo;
+        document.getElementById('detailItem').textContent = item;
+        document.getElementById('detailSerial').textContent = serial;
+        document.getElementById('detailBorrowDate').textContent = borrowDate;
+        document.getElementById('detailReturnDate').textContent = returnDate;
+        document.getElementById('detailFaculty').textContent = faculty;
+        document.getElementById('detailContact').textContent = contact;
+        document.getElementById('detailRemarks').textContent = remarks;
+
+        // Load calendar
+        const now = new Date();
+        calViewYear = now.getFullYear();
+        calViewMonth = now.getMonth();
+        currentItemBookings = await fetchItemBookings(inventoryId);
+        renderCalendar();
+
+        document.getElementById('detailsModal').style.display = 'flex';
+    }
+
+    function closeDetailsModal() {
+        document.getElementById('detailsModal').style.display = 'none';
+    }
+
+    document.getElementById('detailsModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDetailsModal();
+    });
+
+</script>
 {% endblock %}
