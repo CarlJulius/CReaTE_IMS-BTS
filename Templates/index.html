@@ -19,9 +19,19 @@
     </div>
 
     <div class="container">
-        <a href="{{ url_for('student_information') }}" class="btn student-btn">Student Portal</a>
-        <a href="{{ url_for('admin') }}" class="btn admin-btn">Faculty Login</a>
+        <a href="{{ url_for('student_information') }}" class="btn student-btn">Borrowers Portal</a>
+        <a href="{{ url_for('admin') }}" class="btn admin-btn">Admin Log in</a>
+        <div class="link-group">
+         <div class="back-link">
+            <a href="{{ url_for('signup') }}">← Sign up(for faculty)</a>
+            
+         </div>
+         <div class="back-link">
+            <a href="{{ url_for('student_requests') }}"> My Requests →</a>
+         </div>
+        </div>
     </div>
+    
 
 </body>
 </html>

@@ -27,14 +27,20 @@
             <h2>Admin Panel</h2>
         </div>
 
-        <ul class="nav-links">
+       <ul class="nav-links">
             <li><a href="{{ url_for('admin_dashboard') }}"><i class="fa-solid fa-gauge"></i> Dashboard</a></li>
+            
+            {% if session.faculty.role in ['master_admin', 'approver'] %}
             <li><a href="{{ url_for('inventory') }}"><i class="fa-solid fa-box-open"></i> Manage Inventory</a></li>
-            <li><a href="{{ url_for('faculty') }}"><i class="fa-solid fa-user-graduate"></i> Manage Faculty</a></li>
-            <li><a href="{{ url_for('office') }}"><i class="fa-solid fa-building"></i> Office</a></li>
             <li><a href="{{ url_for('requests') }}"><i class="fa-solid fa-clipboard-list"></i> Manage Requests</a></li>
             <li><a href="{{ url_for('borrowed_items') }}"><i class="fa-solid fa-book-open"></i> Borrowed Items</a></li>
             <li><a href="{{ url_for('reports') }}"><i class="fa-solid fa-file-lines"></i> Reports</a></li>
+            {% endif %}
+
+            {% if session.faculty.role == 'master_admin' %}
+            <li><a href="{{ url_for('faculty') }}"><i class="fa-solid fa-user-graduate"></i> Manage Faculty</a></li>
+            <li><a href="{{ url_for('office') }}"><i class="fa-solid fa-building"></i> Office</a></li>
+            {% endif %}
         </ul>
 
         <div class="logout">

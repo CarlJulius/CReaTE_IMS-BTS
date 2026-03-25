@@ -100,6 +100,11 @@ class Faculty(db.Model):
     faculty_nm = db.Column(db.String(100), nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    role = db.Column(
+        Enum('master_admin', 'approver', 'faculty', name = 'faculty_role'),
+        default = 'faculty', 
+        nullable=False
+        )
     office_id = db.Column(db.Integer, db.ForeignKey('office.office_id'), nullable=False, index=True)
 
     office = db.relationship('Office', back_populates='faculties')

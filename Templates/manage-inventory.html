@@ -4,17 +4,38 @@
 <main class="main-content">
     <div class="page-header">
         <h2>Inventory List</h2>
-        <button id="openModalBtn" class="action-btn add-btn">
-            <i class="fa-solid fa-plus"></i> Add New Item
-        </button>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <!-- Download Template -->
+            <a href="{{ url_for('download_template') }}">
+                <button class="action-btn" type="button" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);">
+                    <i class="fa-solid fa-download"></i> Template
+                </button>
+            </a>
+
+            <!-- Import CSV -->
+            <form method="post" action="{{ url_for('import_inventory') }}" enctype="multipart/form-data" style="display:inline;">
+                {{ add_form.csrf_token }}
+                <label for="csv_file" class="action-btn" style="cursor:pointer; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);">
+                    <i class="fa-solid fa-file-import"></i> Import CSV
+                </label>
+                <input type="file" id="csv_file" name="csv_file" accept=".csv" style="display:none;"
+                    onchange="this.form.submit()">
+            </form>
+
+            <!-- Add New Item -->
+            <button id="openModalBtn" class="action-btn add-btn">
+                <i class="fa-solid fa-plus"></i> Add New Item
+            </button>
+        </div>
     </div>
     <div class="controls-container" style="margin-bottom: 1rem;">
-    <form method="get" action="{{ url_for('inventory') }}" style="display:flex; gap:8px; align-items:center;">
+    <form method="get" action="{{ url_for('inventory') }}" style="display:flex;gap:8px;align-items:center;width:100%;">
         <div class="search-box">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" name="q" placeholder="Search by name, serial, or category..." value="{{ q|default('') }}">
+            <button class="action-btn" type="submit" style="margin-left:8px;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);padding:10px 18px;border-radius:8px;">Search</button>
         </div>
-        <button class="action-btn" type="submit">Search</button>
+        
     </form>
     </div>
 
