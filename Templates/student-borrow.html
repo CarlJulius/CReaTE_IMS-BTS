@@ -8,6 +8,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/CSU-logo.png') }}">
 
 <style>
 
@@ -179,9 +180,9 @@ No inventory item selected.
 {% if student %}
 <div class="student-box">
 
-<strong>Student:</strong> {{ student.name }} <br>
+<strong>Borrower:</strong> {{ student.name }} <br>
 <strong>ID:</strong> {{ student.number }} <br>
-<strong>Course:</strong> {{ student.course }} {{ student.year }}
+<strong>Other info:</strong> {{ student.course }} {{ student.year }}
 
 </div>
 {% endif %}
@@ -223,7 +224,7 @@ No inventory item selected.
     {{ form.return_date(class="form-control") }}
 </div>
 <div class="form-group">
-    <label for="faculty_incharge">Faculty In Charge</label>
+    <label for="faculty_incharge">Faculty In Charge(Faculty that issued the equipment)</label>
     {{ form.faculty_incharge(class="form-control", placeholder="Enter the name of the faculty in charge") }}
 </div>
 <div class="form-group">

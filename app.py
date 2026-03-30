@@ -316,11 +316,28 @@ def borrowed_items():
 @admin_required
 def mark_returned(borrow_id):
     borrow = BorrowTracker.query.get_or_404(borrow_id)
+    returned_condition = request.form.get('returned_condition', 'functional')
+    return_remarks = request.form.get('return_remarks', '').strip()
+
     borrow.status = 'returned'
-    borrow.inventory.is_available = True
+
+    # Update inventory condition and availability based on returned condition
+    borrow.inventory.inventory_condition = returned_condition
+    borrow.inventory.is_available = returned_condition == 'functional'
+
+    # Append return remarks to existing remarks
+    if return_remarks:
+        existing = borrow.remarks or ''
+        borrow.remarks = f"{existing} | Return note: {return_remarks}".strip(' |')
+
     db.session.commit()
     cache.clear()
-    flash('Item marked as returned.', 'success')
+
+    if returned_condition == 'functional':
+        flash('Item marked as returned and available.', 'success')
+    else:
+        flash(f'Item marked as returned but set to {returned_condition} — not available for borrowing.', 'warning')
+
     return redirect(url_for('borrowed_items'))
 
 @app.route('/admin/inventory', methods=['GET', 'POST'])
@@ -1252,6 +1269,10 @@ def student_borrow():
     inventory_id = request.args.get('inventory_id') or form.inventory_id.data
     inventory_item = Inventory.query.get(inventory_id) if inventory_id else None
 
+    if inventory_item and inventory_item.inventory_condition != 'functional':
+        flash(f'This item is currently {inventory_item.inventory_condition} and unavailable for borrowing.', 'danger')
+        return redirect(url_for('student_dashboard'))
+
     if inventory_item:
         form.inventory_id.data = inventory_item.inventory_id
 
@@ -1315,6 +1336,11 @@ def student_borrow_bulk():
         for inv_id in inventory_ids:
             inventory_item = Inventory.query.get(inv_id)
             if not inventory_item:
+                skipped.append(inventory_item.inventory_nm)
+                continue
+
+            #skip non-functional, under-maintenance, and under-repair items
+            if inventory_item.inventory_condition != 'functional':
                 skipped.append(inv_id)
                 continue
 
@@ -1341,7 +1367,7 @@ def student_borrow_bulk():
         if borrowed:
             flash(f'Borrow requests submitted for: {", ".join(borrowed)}.', 'success')
         if skipped:
-            flash(f'{len(skipped)} item(s) were skipped.', 'warning')
+            flash(f'{len(skipped)} item(s) were skipped. {", ".join(skipped)}', 'warning')
 
         return redirect(url_for('student_dashboard'))
 

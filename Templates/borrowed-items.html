@@ -78,6 +78,47 @@
         </div>
         
     </div>
+    <!-- Return Modal -->
+    <div id="returnModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#1a2e1a; padding:2rem; border-radius:12px; width:400px; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);">
+            <h3 style="margin-bottom:1.5rem; color:white;">
+                <i class="fa-solid fa-rotate-left"></i> Mark as Returned
+            </h3>
+
+            <p id="returnItemName" style="color:rgba(255,255,255,0.7); font-size:0.85rem; margin-bottom:1.5rem;"></p>
+
+            <form id="returnForm" method="post" action="">
+
+                <div style="margin-bottom:1rem;">
+                    <label style="color:white; font-size:14px; display:block; margin-bottom:8px;">Item Condition upon Return</label>
+                    <select name="returned_condition" required
+                        style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white; outline:none;">
+                        <option value="functional">Functional</option>
+                        <option value="non-functional">Non-Functional</option>
+                        <option value="under-maintenance">Under Maintenance</option>
+                        <option value="under-repair">Under Repair</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom:1.5rem;">
+                    <label style="color:white; font-size:14px; display:block; margin-bottom:8px;">Remarks <span style="opacity:0.5; font-size:12px;">(optional)</span></label>
+                    <textarea name="return_remarks" rows="3" placeholder="Any notes about the returned item..."
+                        style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white; resize:none; outline:none;"></textarea>
+                </div>
+
+                <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                    <button type="button" onclick="closeReturnModal()"
+                        style="padding:0.5rem 1rem; border-radius:20px; border:1px solid rgba(255,255,255,0.3); background:transparent; color:white; cursor:pointer;">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        style="padding:0.5rem 1rem; border-radius:20px; border:none; background:#22c55e; color:#0f1f0f; font-weight:bold; cursor:pointer;">
+                        <i class="fa-solid fa-check"></i> Confirm Return
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     
     <main class="main-content">
         
@@ -138,15 +179,13 @@
                             <button class="action-btn details-btn"
                                 onclick="openDetailsModal('{{ item.borrow_id }}', '{{ item.student.student_nm }}', '{{ item.student.student_number }}', '{{ item.inventory.inventory_nm }}', '{{ item.inventory.serial_number }}', '{{ item.borrow_date.strftime('%Y-%m-%d') if item.borrow_date else 'N/A' }}', '{{ item.return_date.strftime('%Y-%m-%d') if item.return_date else 'N/A' }}', '{{ item.faculty_incharge or 'N/A' }}', '{{ item.contact_number or 'N/A' }}', '{{ item.remarks or 'N/A' }}', {{ item.inventory_id }})">
                                 Details
-                            </button>
                             {% if item.status in ['approved', 'borrowed', 'overdue'] %}
-                            <form method="post" action="{{ url_for('mark_returned', borrow_id=item.borrow_id) }}" style="display:inline;">
-                                <button class="action-btn return-btn">
-                                    <i class="fa-solid fa-check"></i> Mark Returned
-                                </button>
-                            </form>
-                            {% else %}
-                            <button class="action-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;">View Record</button>
+                            <button class="action-btn return-btn"
+                                data-borrow-id="{{ item.borrow_id }}"
+                                data-item="{{ item.inventory.inventory_nm }}"
+                                onclick="openReturnModal(this)">
+                                <i class="fa-solid fa-check"></i> Mark Returned
+                            </button>
                             {% endif %}
                         </td>
                     </tr>
@@ -269,5 +308,22 @@
         if (e.target === this) closeDetailsModal();
     });
 
+    function openReturnModal(btn) {
+        const borrowId = btn.dataset.borrowId;
+        const itemName = btn.dataset.item;
+
+        document.getElementById('returnItemName').textContent = 'Item: ' + itemName;
+        document.getElementById('returnForm').action = `/admin/borrowed-items/return/${borrowId}`;
+        document.getElementById('returnModal').style.display = 'flex';
+    }
+
+    function closeReturnModal() {
+        document.getElementById('returnModal').style.display = 'none';
+        document.getElementById('returnForm').reset();
+    }
+
+    document.getElementById('returnModal').addEventListener('click', function(e) {
+        if (e.target === this) closeReturnModal();
+    });
 </script>
 {% endblock %}

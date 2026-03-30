@@ -205,10 +205,10 @@
               <div class="card-footer">
                   <div style="display:flex;gap:6px;align-items:center">
                       <button class="card-btn view-btn" onclick="openModal({{ item.id }})">Details</button>
-                      {% if item.available %}
+                      {% if item.condition == 'functional' %}
                       <button class="card-btn borrow" onclick="window.location.href='/student/borrow?inventory_id={{ item.id }}'">📦 Borrow</button>
                       {% else %}
-                      <button class="card-btn borrow" onclick="window.location.href='/student/borrow?inventory_id={{ item.id }}'">📦 Borrow</button>
+                      <button class="card-btn borrow" disabled title="This item is currently {{ item.condition }} and unavailable for borrowing." >{{item.condition|replace(' ', '-')|title }}</button>
                       {% endif %}
                   </div>
               </div>

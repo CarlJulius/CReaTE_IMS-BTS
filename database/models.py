@@ -17,7 +17,7 @@ class Inventory(db.Model):
 
     inventory_id = db.Column(db.Integer, primary_key=True)
     inventory_nm = db.Column(db.String(100), nullable=False)
-    inventory_desc = db.Column(db.String(200))
+    inventory_desc = db.Column(db.String(500))
     inventory_condition = db.Column(
         Enum('functional', 'non-functional','under-maintenance','under-repair', name='condition_enum'),
         nullable=False
@@ -44,7 +44,7 @@ class BorrowTracker(db.Model):
     return_date = db.Column(db.Date, nullable=True)
     faculty_incharge = db.Column(db.String(100), nullable=True)
     contact_number = db.Column(db.String(11), nullable=True)
-    remarks = db.Column(db.String(200), nullable=True)
+    remarks = db.Column(db.String(500), nullable=True)
 
     status = db.Column(
         Enum(
