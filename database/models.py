@@ -19,7 +19,7 @@ class Inventory(db.Model):
     inventory_nm = db.Column(db.String(100), nullable=False)
     inventory_desc = db.Column(db.String(500))
     inventory_condition = db.Column(
-        Enum('functional', 'non-functional','under-maintenance','under-repair', name='condition_enum'),
+        Enum('functional', 'non-functional','under-maintenance','under-repair', 'lost', name='condition_enum'),
         nullable=False
     )
     serial_number = db.Column(db.String(100), unique=True, nullable=False)
@@ -122,8 +122,14 @@ class Reports(db.Model):
     report_id = db.Column(db.Integer, primary_key=True)
     inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.inventory_id'), nullable=False, index=True)
     student_id = db.Column(db.Integer, db.ForeignKey('student.student_id'), nullable=False, index=True)
+    borrow_id = db.Column(db.Integer, db.ForeignKey('borrow_tracker.borrow_id'), nullable=True, index=True)  # ← add
+    report_type = db.Column(
+        Enum('damaged', 'lost', name='report_type_enum'),
+        nullable=False
+    )  # ← add
     report_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     description = db.Column(db.String(200), nullable=False)
 
     inventory = db.relationship('Inventory', backref='reports')
     student = db.relationship('Student', backref='reports')
+    borrow = db.relationship('BorrowTracker', backref='report')  

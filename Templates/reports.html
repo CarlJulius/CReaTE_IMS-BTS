@@ -7,7 +7,9 @@
         <div class="page-header">
             <h2>System Reports</h2>
             <a href="{{ url_for('export_csv') }}">
-                <button class="action-btn export-btn"><i class="fa-solid fa-download"></i> Export to CSV</button>
+                <button class="action-btn export-btn">
+                    <i class="fa-solid fa-download"></i> Export to CSV
+                </button>
             </a>
         </div>
 
@@ -59,6 +61,94 @@
                 </div>
                 {% endfor %}
             </div>
+        </div>
+
+        <!-- Equipment Quantity Summary -->
+        <div class="table-container" style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem;">Equipment Quantity Summary</h3>
+            {% if itemkind_summary %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Equipment Group</th>
+                        <th>Total Units</th>
+                        <th>Available</th>
+                        <th>Borrowed</th>
+                        <th>Utilization</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itemkind_summary %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.total }}</td>
+                        <td style="color: #4ade80;">{{ item.available }}</td>
+                        <td style="color: #f87171;">{{ item.borrowed }}</td>
+                        <td>
+                            {% if item.total > 0 %}
+                                {% set utilization = ((item.borrowed / item.total) * 100) | round | int %}
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div style="flex: 1; background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px;">
+                                        <div style="width: {{ utilization }}%; background: #f87171; border-radius: 4px; height: 8px;"></div>
+                                    </div>
+                                    <span style="font-size: 0.8rem;">{{ utilization }}%</span>
+                                </div>
+                            {% else %}
+                                <span style="color: rgba(255,255,255,0.4);">N/A</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p style="color: rgba(255,255,255,0.5);">No equipment groups found.</p>
+            {% endif %}
+        </div>
+
+        <!-- Damage / Lost Reports -->
+        <div class="table-container" style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem;">Damage / Lost Reports</h3>
+            {% if recent_reports %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Item</th>
+                        <th>Serial No.</th>
+                        <th>Student</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recent_reports %}
+                    <tr>
+                        <td>{{ r.report_date.strftime('%b %d, %Y') }}</td>
+                        <td>{{ r.inventory.inventory_nm if r.inventory else 'N/A' }}</td>
+                        <td style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">
+                            {{ r.inventory.serial_number if r.inventory else '—' }}
+                        </td>
+                        <td>{{ r.student.student_nm if r.student else 'N/A' }}</td>
+                        <td>
+                            {% if r.report_type == 'lost' %}
+                                <span style="color: #f87171; font-weight: 600;">
+                                    <i class="fa-solid fa-circle-xmark"></i> Lost
+                                </span>
+                            {% else %}
+                                <span style="color: #fb923c; font-weight: 600;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> Damaged
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.description or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p style="color: rgba(255,255,255,0.5);">No damage or lost reports filed yet.</p>
+            {% endif %}
         </div>
 
     </main>

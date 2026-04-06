@@ -32,12 +32,18 @@
     <span style="font-size:0.78rem">Hello, {{ student.name }}</span>
     <a href="{{ url_for('student_cart') }}" class="nav-cart-link" title="My Cart">
       <div class="nav-cart">
-        <button class="badge approved">My Cart</button>
-
+        <button class="nav-btn nav-btn-cart">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 01-8 0"/>
+          </svg>
+          My Cart
+        </button>
       </div>
     </a>
     <a href="{{ url_for('student_logout') }}">
-      <button class="badge active-borrow">Logout</button>
+      <button class="nav-btn nav-btn-logout">Logout</button>
     </a>
     
   </div>
@@ -82,18 +88,59 @@
               value="{{ search_query|default('') }}"
               oninput="filterItems()">
       </div>
-      <div class="filter-row" id="filterRow">
-          <button class="filter-btn {% if current_category == 'all' %}active{% endif %}" 
-              onclick="setCategory('all', this)">All</button>
-          {% set categories = items|map(attribute='category')|unique|list %}
-          {% for cat in categories %}
-          <button class="filter-btn {% if current_category == cat %}active{% endif %}"
-              onclick="setCategory('{{ cat }}', this)">
-              {{ cat }}
+      <div class="category-dropdown" id="categoryDropdown">
+          <button class="category-trigger" id="categoryTrigger" onclick="toggleCategoryDropdown()">
+              <span id="categoryLabel">Category</span>
+              <svg id="categoryArrow" class="category-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+                  <path d="M7 10l5 5 5-5z"/>
+              </svg>
           </button>
-          {% endfor %}
+          <div class="category-panel" id="categoryPanel">
+              <!-- Available filter -->
+              <label class="category-check-item category-check-available">
+                  <input type="checkbox" class="cat-checkbox" value="__available__" onchange="handleCheckboxChange()">
+                  <span class="cat-checkmark"></span>
+                  <span class="avail-dot"></span>
+                  Available only
+              </label>
+              <div class="category-divider"></div>
+              <!-- Category checkboxes -->
+              {% set categories = items|map(attribute='category')|unique|list %}
+              {% for cat in categories %}
+              <label class="category-check-item">
+                  <input type="checkbox" class="cat-checkbox" value="{{ cat|lower }}" onchange="handleCheckboxChange()">
+                  <span class="cat-checkmark"></span>
+                  {{ cat }}
+              </label>
+              {% endfor %}
+              <!-- Footer: Clear -->
+              <div class="category-panel-footer">
+                  <button class="cat-clear-btn" onclick="clearAllFilters()">Clear all</button>
+              </div>
+          </div>
       </div>
   </div>
+
+  <!-- WARNING BANNER -->
+  <div class="warning-banner" id="warningBanner">
+      <div class="warning-banner-left">
+          <span class="warning-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+              </svg>
+          </span>
+          <div class="warning-text">
+              <span class="warning-title">Handle with Care</span>
+              <span class="warning-msg">Please handle all borrowed equipment with care. Damaged or lost items may be subject to penalties.</span>
+          </div>
+      </div>
+      <button class="warning-dismiss" onclick="dismissWarning()" title="Dismiss">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+      </button>
+  </div>
+
   <!-- TUTORIAL CARD -->
   <div class="tutorial-card" id="tutorialCard">
       <div class="tutorial-header">
@@ -101,10 +148,8 @@
               <span style="font-size:1.2rem;">💡</span>
               <strong style="font-size:0.9rem;">How to use the Borrower's Dashboard</strong>
           </div>
-          <button onclick="toggleTutorial()" id="tutorialToggle" 
-              style="background:none; border:none; cursor:pointer; font-size:0.78rem; color:var(--muted); padding:4px 8px; border-radius:6px; transition:background 0.15s;"
-              onmouseover="this.style.background='var(--tag-bg)'" onmouseout="this.style.background='none'">
-              Hide ▲
+          <button onclick="toggleTutorial()" id="tutorialToggle" class="tutorial-toggle-btn">
+              Show ▼
           </button>
       </div>
 
@@ -112,7 +157,13 @@
           <div class="tutorial-steps">
 
               <div class="tutorial-step">
-                  <div class="tutorial-step-icon">🔍</div>
+                  <div class="tutorial-step-icon">
+                      <span class="ts-icon ts-icon-blue">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                          </svg>
+                      </span>
+                  </div>
                   <div>
                       <div class="tutorial-step-title">Search & Filter</div>
                       <div class="tutorial-step-desc">Use the search bar to find equipment by name, serial number, or condition. Click the category buttons to filter by type.</div>
@@ -120,7 +171,13 @@
               </div>
 
               <div class="tutorial-step">
-                  <div class="tutorial-step-icon">📦</div>
+                  <div class="tutorial-step-icon">
+                      <span class="ts-icon ts-icon-orange">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                          </svg>
+                      </span>
+                  </div>
                   <div>
                       <div class="tutorial-step-title">Borrow an Item</div>
                       <div class="tutorial-step-desc">Click <strong>Borrow</strong> on any item card to fill out a borrow request form. Your request will go through an approval process before it's confirmed.</div>
@@ -128,7 +185,15 @@
               </div>
 
               <div class="tutorial-step">
-                  <div class="tutorial-step-icon">🛒</div>
+                  <div class="tutorial-step-icon">
+                      <span class="ts-icon ts-icon-green">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+                              <line x1="3" y1="6" x2="21" y2="6"/>
+                              <path d="M16 10a4 4 0 01-8 0"/>
+                          </svg>
+                      </span>
+                  </div>
                   <div>
                       <div class="tutorial-step-title">Use the Cart</div>
                       <div class="tutorial-step-desc">Click the <strong>+Cart</strong> icon on a card to add it to your cart. Go to your cart, located at the top right next to the logout button to borrow multiple items at once using <strong>Borrow All</strong>.</div>
@@ -136,7 +201,13 @@
               </div>
 
               <div class="tutorial-step">
-                  <div class="tutorial-step-icon">📅</div>
+                  <div class="tutorial-step-icon">
+                      <span class="ts-icon ts-icon-purple">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+                          </svg>
+                      </span>
+                  </div>
                   <div>
                       <div class="tutorial-step-title">Read the Calendar</div>
                       <div class="tutorial-step-desc">Click <strong>Details</strong> on any item to see its borrowing schedule. 
@@ -151,10 +222,35 @@
               </div>
 
               <div class="tutorial-step">
-                  <div class="tutorial-step-icon">📋</div>
+                  <div class="tutorial-step-icon">
+                      <span class="ts-icon ts-icon-teal">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                              <polyline points="14 2 14 8 20 8"/>
+                              <line x1="16" y1="13" x2="8" y2="13"/>
+                              <line x1="16" y1="17" x2="8" y2="17"/>
+                              <polyline points="10 9 9 9 8 9"/>
+                          </svg>
+                      </span>
+                  </div>
                   <div>
                       <div class="tutorial-step-title">Check Your Requests</div>
                       <div class="tutorial-step-desc">Go to <strong>My Requests</strong> from the landing page and enter your student ID to see the status of all your borrow requests.</div>
+                  </div>
+              </div>
+
+              <div class="tutorial-step">
+                  <div class="tutorial-step-icon">
+                      <span class="ts-icon ts-icon-red">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <circle cx="12" cy="12" r="10"/>
+                              <polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                      </span>
+                  </div>
+                  <div>
+                      <div class="tutorial-step-title">Return on Time</div>
+                      <div class="tutorial-step-desc">Always return borrowed equipment by the agreed date. Late returns may affect your future borrowing privileges. Check your return date in <strong>My Requests</strong>.</div>
                   </div>
               </div>
 
@@ -177,10 +273,12 @@
                   <span class="avail-badge {{ 'yes' if item.available else 'no' }}">
                       {{ 'Available' if item.available else 'Unavailable today' }}
                   </span>
-                  <p>Add to Cart→</p>
+                  <span class="add-to-cart-label">Add to Cart →</span>
                   <button class="card-cart-icon" onclick="addToCart({{ item.id }}, '{{ item.name }}', '{{ item.category }}', {{ item.available|tojson }})" title="Add to Cart">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3zm-4 9c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2zm-9.83-3.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.86-7.01L19.42 4h-.01l-1.1 2-2.76 5H8.53l-.13-.27L6.16 6l-.95-2-.94-2H1v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.13 0-.25-.11-.25-.25z"/>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+                          <line x1="3" y1="6" x2="21" y2="6"/>
+                          <path d="M16 10a4 4 0 01-8 0"/>
                       </svg>
                   </button>
               </div>
@@ -221,6 +319,13 @@
           <h3>No items found</h3>
           <p>Try adjusting your search or filter</p>
       </div>
+  </div>
+
+  <!-- PAGINATION -->
+  <div class="pagination-wrap" id="paginationWrap">
+      <button class="page-btn page-prev" id="pagePrev" onclick="changePage(currentPage - 1)">&#8249; Prev</button>
+      <div class="page-numbers" id="pageNumbers"></div>
+      <button class="page-btn page-next" id="pageNext" onclick="changePage(currentPage + 1)">Next &#8250;</button>
   </div>
 </div>
 
@@ -433,85 +538,225 @@
   updateCartBadge();
 </script>
 <script>
-    let activeCategory = '{{ current_category }}';
+    // ── PAGINATION + MULTI-SELECT CATEGORY FILTER ──
 
-    function filterItems() {
-        const search = document.getElementById('liveSearch').value.toLowerCase();
-        const cards = document.querySelectorAll('.card');
-        let visibleCount = 0;
+    const ITEMS_PER_PAGE = 18;
+    let currentPage = 1;
+    let matchedCards = [];  // cards passing current filter
 
-        cards.forEach(card => {
-            const name = card.dataset.name || '';
-            const category = card.dataset.category || '';
-            const serial = card.dataset.serial || '';
-            const condition = card.dataset.condition || '';
-
-            const matchesSearch = !search ||
-                name.includes(search) ||
-                category.includes(search) ||
-                serial.includes(search) ||
-                condition.includes(search);
-
-            const matchesCategory = activeCategory === 'all' ||
-                category === activeCategory.toLowerCase();
-
-            if (matchesSearch && matchesCategory) {
-                card.style.display = '';
-                visibleCount++;
-            } else {
-                card.style.display = 'none';
-            }
-        });
-
-        // Show/hide empty state
-        document.getElementById('emptyState').style.display = visibleCount === 0 ? 'block' : 'none';
-
-        // Update hero stats
-        updateStats();
+    function getCheckedValues() {
+        return [...document.querySelectorAll('.cat-checkbox:checked')].map(cb => cb.value);
     }
 
-    function setCategory(cat, btn) {
-        activeCategory = cat;
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        filterItems();
+    // Returns true if a card passes the current search + category filters
+    function cardMatches(card) {
+        const search = document.getElementById('liveSearch').value.toLowerCase();
+        const checked = getCheckedValues();
+        const availableOnly = checked.includes('__available__');
+        const categoryFilters = checked.filter(v => v !== '__available__');
+
+        const name      = card.dataset.name      || '';
+        const category  = card.dataset.category  || '';
+        const serial    = card.dataset.serial    || '';
+        const condition = card.dataset.condition || '';
+        const isAvail   = card.dataset.available === 'true';
+
+        const matchesSearch = !search ||
+            name.includes(search) ||
+            category.includes(search) ||
+            serial.includes(search) ||
+            condition.includes(search);
+
+        const matchesCategory =
+            checked.length === 0 ||
+            (availableOnly && categoryFilters.length === 0
+                ? isAvail
+                : (categoryFilters.length === 0 || categoryFilters.includes(category)) &&
+                  (!availableOnly || isAvail));
+
+        return matchesSearch && matchesCategory;
+    }
+
+    function filterItems() {
+        const allCards = [...document.querySelectorAll('.card')];
+
+        // Separate matching from non-matching
+        matchedCards = allCards.filter(c => cardMatches(c));
+        const hidden  = allCards.filter(c => !cardMatches(c));
+
+        // Hide non-matching cards immediately
+        hidden.forEach(c => c.style.display = 'none');
+
+        // Reset to page 1 whenever filters change
+        currentPage = 1;
+        renderPage();
+        updateStats();
+        updateTriggerLabel();
+    }
+
+    function renderPage() {
+        const totalPages = Math.max(1, Math.ceil(matchedCards.length / ITEMS_PER_PAGE));
+        currentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        const end   = start + ITEMS_PER_PAGE;
+
+        // Show only the current page's slice; hide the rest
+        matchedCards.forEach((card, i) => {
+            card.style.display = (i >= start && i < end) ? '' : 'none';
+        });
+
+        // Empty state
+        document.getElementById('emptyState').style.display =
+            matchedCards.length === 0 ? 'block' : 'none';
+
+        renderPaginationControls(totalPages);
+    }
+
+    function renderPaginationControls(totalPages) {
+        const wrap    = document.getElementById('paginationWrap');
+        const prevBtn = document.getElementById('pagePrev');
+        const nextBtn = document.getElementById('pageNext');
+        const numbersEl = document.getElementById('pageNumbers');
+
+        // Hide pagination entirely if everything fits on one page
+        wrap.style.display = totalPages <= 1 ? 'none' : 'flex';
+
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+
+        // Build page number buttons with smart ellipsis
+        numbersEl.innerHTML = '';
+        const pages = getPageRange(currentPage, totalPages);
+        pages.forEach(p => {
+            if (p === '…') {
+                const span = document.createElement('span');
+                span.className = 'page-ellipsis';
+                span.textContent = '…';
+                numbersEl.appendChild(span);
+            } else {
+                const btn = document.createElement('button');
+                btn.className = 'page-num' + (p === currentPage ? ' active' : '');
+                btn.textContent = p;
+                btn.onclick = () => changePage(p);
+                numbersEl.appendChild(btn);
+            }
+        });
+    }
+
+    // Produces e.g. [1, 2, 3, '…', 10] or [1, '…', 4, 5, 6, '…', 10]
+    function getPageRange(current, total) {
+        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+        const pages = [];
+        if (current <= 4) {
+            pages.push(1, 2, 3, 4, 5, '…', total);
+        } else if (current >= total - 3) {
+            pages.push(1, '…', total - 4, total - 3, total - 2, total - 1, total);
+        } else {
+            pages.push(1, '…', current - 1, current, current + 1, '…', total);
+        }
+        return pages;
+    }
+
+    function changePage(p) {
+        const totalPages = Math.ceil(matchedCards.length / ITEMS_PER_PAGE);
+        if (p < 1 || p > totalPages) return;
+        currentPage = p;
+        renderPage();
+        // Scroll smoothly back to the top of the grid
+        document.getElementById('itemGrid').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ── LABEL / STATS ──
+
+    function updateTriggerLabel() {
+        const checked = getCheckedValues();
+        const label = document.getElementById('categoryLabel');
+        if (checked.length === 0) {
+            label.textContent = 'Category';
+            document.getElementById('categoryTrigger').classList.remove('has-filter');
+        } else if (checked.length === 1 && checked[0] === '__available__') {
+            label.innerHTML = '<span class="trigger-avail-dot"></span> Available';
+            document.getElementById('categoryTrigger').classList.add('has-filter');
+        } else {
+            const catCount = checked.filter(v => v !== '__available__').length;
+            const hasAvail = checked.includes('__available__');
+            const parts = [];
+            if (catCount > 0) parts.push(catCount === 1
+                ? checked.find(v => v !== '__available__')
+                : `${catCount} categories`);
+            if (hasAvail) parts.push('Available');
+            label.textContent = parts.join(' · ');
+            document.getElementById('categoryTrigger').classList.add('has-filter');
+        }
     }
 
     function updateStats() {
-        const visibleCards = [...document.querySelectorAll('.card')]
-            .filter(c => c.style.display !== 'none');
-
-        const availableCount = visibleCards
-            .filter(c => c.dataset.available === 'true').length;
-
-        const uniqueCategories = new Set(
-            visibleCards.map(c => c.dataset.category)
-        ).size;
-
-        document.querySelector('.hero-stat-num:nth-child(1)') &&
-            (document.querySelectorAll('.hero-stat-num')[0].textContent = visibleCards.length);
+        const availableCount   = matchedCards.filter(c => c.dataset.available === 'true').length;
+        const uniqueCategories = new Set(matchedCards.map(c => c.dataset.category)).size;
+        document.querySelectorAll('.hero-stat-num')[0].textContent = matchedCards.length;
         document.querySelectorAll('.hero-stat-num')[1].textContent = availableCount;
         document.querySelectorAll('.hero-stat-num')[2].textContent = uniqueCategories;
     }
 
-    // Run on page load to apply any pre-existing filter
-    filterItems();
+    // ── CHECKBOX HELPERS ──
+
+    function handleCheckboxChange() { filterItems(); }
+
+    function clearAllFilters() {
+        document.querySelectorAll('.cat-checkbox').forEach(cb => cb.checked = false);
+        filterItems();
+    }
+
+    // ── DROPDOWN TOGGLE ──
+
+    function toggleCategoryDropdown() {
+        const panel = document.getElementById('categoryPanel');
+        const arrow = document.getElementById('categoryArrow');
+        const isOpen = panel.classList.contains('open');
+        panel.classList.toggle('open', !isOpen);
+        arrow.classList.toggle('rotated', !isOpen);
+    }
+
+    document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('categoryDropdown');
+        if (!dropdown.contains(e.target)) {
+            document.getElementById('categoryPanel').classList.remove('open');
+            document.getElementById('categoryArrow').classList.remove('rotated');
+        }
+    });
+
+    // ── TUTORIAL ──
+
     function toggleTutorial() {
         const content = document.getElementById('tutorialContent');
         const btn = document.getElementById('tutorialToggle');
         const isVisible = content.style.display !== 'none';
-
         content.style.display = isVisible ? 'none' : 'block';
         btn.textContent = isVisible ? 'Show ▼' : 'Hide ▲';
-
-        // Remember preference in localStorage
         localStorage.setItem('tutorialHidden', isVisible ? 'true' : 'false');
     }
 
-    // Restore preference on load
+    // Restore preference; default: visible → button says "Hide ▲"
     if (localStorage.getItem('tutorialHidden') === 'true') {
         document.getElementById('tutorialContent').style.display = 'none';
         document.getElementById('tutorialToggle').textContent = 'Show ▼';
+    } else {
+        document.getElementById('tutorialContent').style.display = 'block';
+        document.getElementById('tutorialToggle').textContent = 'Hide ▲';
+    }
+
+    // ── INIT ──
+    filterItems();
+
+    // ── WARNING BANNER DISMISS ──
+    // Clear any previously stored dismiss so the banner always shows on load
+    sessionStorage.removeItem('warningDismissed');
+
+    function dismissWarning() {
+        const banner = document.getElementById('warningBanner');
+        banner.classList.add('warning-hiding');
+        setTimeout(() => banner.style.display = 'none', 300);
     }
 </script>
 

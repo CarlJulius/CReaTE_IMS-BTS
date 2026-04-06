@@ -35,7 +35,7 @@ class SignupForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=1, max=50)])
     office = StringField('Office', validators=[DataRequired(), Length(min=1, max=100)])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=1, max=100)])
-    comfirm_password = PasswordField('Confirm Password', validators=[DataRequired(), Length(min=1, max=100)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), Length(min=1, max=100)])
     submit = SubmitField('Sign Up')
 
 

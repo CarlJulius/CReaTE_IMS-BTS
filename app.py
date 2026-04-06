@@ -42,6 +42,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = not app.debug
 
 # Check session expiry on every student request
 @app.before_request
@@ -130,7 +131,7 @@ def admin_logout():
 def signup():
     form = SignupForm()
     if form.validate_on_submit():
-        if form.password.data != form.comfirm_password.data:
+        if form.password.data != form.confirm_password.data:
             flash('Passwords do not match', 'danger')
             return render_template('admin-signup.html', form=form)
 
@@ -318,25 +319,37 @@ def mark_returned(borrow_id):
     borrow = BorrowTracker.query.get_or_404(borrow_id)
     returned_condition = request.form.get('returned_condition', 'functional')
     return_remarks = request.form.get('return_remarks', '').strip()
+    report_type = request.form.get('report_type', 'damaged').strip()
+    report_description = request.form.get('report_description', '').strip()
 
     borrow.status = 'returned'
-
-    # Update inventory condition and availability based on returned condition
     borrow.inventory.inventory_condition = returned_condition
     borrow.inventory.is_available = returned_condition == 'functional'
 
-    # Append return remarks to existing remarks
     if return_remarks:
         existing = borrow.remarks or ''
         borrow.remarks = f"{existing} | Return note: {return_remarks}".strip(' |')
+
+    # Auto-file report if damaged or lost
+    if returned_condition in ['non-functional', 'lost']:
+        report = Reports(
+            borrow_id=borrow.borrow_id,
+            inventory_id=borrow.inventory_id,
+            student_id=borrow.student_id,
+            report_type='lost' if returned_condition == 'lost' else 'damaged',
+            description=report_description or return_remarks or 'No description provided.'
+        )
+        db.session.add(report)
 
     db.session.commit()
     cache.clear()
 
     if returned_condition == 'functional':
         flash('Item marked as returned and available.', 'success')
+    elif returned_condition == 'lost':
+        flash('Item marked as lost. Report has been filed.', 'danger')
     else:
-        flash(f'Item marked as returned but set to {returned_condition} — not available for borrowing.', 'warning')
+        flash('Item marked as returned but reported as damaged. Report filed.', 'warning')
 
     return redirect(url_for('borrowed_items'))
 
@@ -377,18 +390,21 @@ def inventory():
             serial_number=add_form.serial.data.strip(),
             office_id=office.office_id,
             category_id=category.category_id,
-            itemkind_id=itemkind.itemkind_id if itemkind else None,
-            is_available=add_form.condition.data.strip() == 'functional'
+            itemkind_id=itemkind.itemkind_id if itemkind else None
         )
 
         db.session.add(new_inv)
         db.session.commit()
-        cache.clear()
         flash('Inventory item added.', 'success')
         return redirect(url_for('inventory'))
 
+    
     q = request.args.get('q', '').strip()
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = 20 
 
+    # Build the query depending on whether the user is searching or not
     if q:
         inv_query = Inventory.query.outerjoin(Category)
         inv_query = inv_query.filter(
@@ -398,12 +414,14 @@ def inventory():
                 Category.category_nm.ilike(f"%{q}%")
             )
         )
-        inventories = inv_query.all()
     else:
-        inventories = Inventory.query.all()
+        inv_query = Inventory.query
 
+    paginated_inventories = inv_query.paginate(page=page, per_page=per_page, error_out=False)
+
+    
     items = []
-    for inv in inventories:
+    for inv in paginated_inventories.items:
         items.append({
             'id': inv.inventory_id,
             'name': inv.inventory_nm,
@@ -423,7 +441,11 @@ def inventory():
                             add_form=add_form,
                             q=q, 
                             office_list=office_list, 
-                            itemkind_list=itemkind_list)
+                            itemkind_list=itemkind_list,
+                            current_page=paginated_inventories.page,   
+                            total_pages=paginated_inventories.pages
+                            )   
+
 
 @app.route('/admin/inventory/edit/<int:item_id>', methods=['POST'])
 @admin_required
@@ -494,83 +516,88 @@ def import_inventory():
 
         # Force strict serial number uniqueness within the file
         df['Serial Number (serial_number)'] = df['Serial Number (serial_number)'].astype(str)
-        seen_serials = set()
+        seen_serials = {}  # serial → row number
+        duplicate_errors = []
+
         for index, row in df.iterrows():
-            base_serial = str(row['Serial Number (serial_number)']).strip(',').strip()
-            final_serial = base_serial
-            counter = 1
-            while final_serial in seen_serials:
-                if re.search(r'-dup\d+$', base_serial):
-                    base_without_dup = re.sub(r'-dup\d+$', '', base_serial)
-                    final_serial = f"{base_without_dup}-dup{counter}"
-                else:
-                    final_serial = f"{base_serial}-dup{counter}"
-                counter += 1
-            seen_serials.add(final_serial)
-            df.at[index, 'Serial Number (serial_number)'] = final_serial
+            serial = str(row['Serial Number (serial_number)']).strip(',').strip()
+            df.at[index, 'Serial Number (serial_number)'] = serial  # normalize it
+
+            if serial in seen_serials:
+                duplicate_errors.append(
+                    f"Row {index + 2}: Serial '{serial}' is a duplicate of Row {seen_serials[serial]}."
+                )
+            else:
+                seen_serials[serial] = index + 2  # store row number for error message
+
+        if duplicate_errors:
+            for msg in duplicate_errors:
+                flash(msg, 'danger')
+            flash('Import cancelled due to duplicate serial numbers in the file. Please fix and re-upload.', 'danger')
+            return redirect(url_for('inventory'))
 
         inserted = 0
         skipped = []
         errors = []
 
         for index, row in df.iterrows():
-            try:
-                # Handle category
-                cat_name = str(row['Category (category_nm)']).strip()
-                category = Category.query.filter_by(category_nm=cat_name).first()
-                if not category:
-                    category = Category(category_nm=cat_name)
-                    db.session.add(category)
-                    db.session.flush()
-
-                # Handle itemkind
-                itemkind_nm = str(row['Itemkind (itemkind_nm)']).strip()
-                itemkind = Itemkind.query.filter_by(itemkind_nm=itemkind_nm).first()
-                if not itemkind:
-                    itemkind = Itemkind(itemkind_nm=itemkind_nm)
-                    db.session.add(itemkind)
-                    db.session.flush()
-
-                # Handle office
-                office_nm = str(row['Office Name (office_nm)']).strip()
-                office = Office.query.filter_by(office_nm=office_nm).first()
-                if not office:
-                    errors.append(f"Row {index + 2}: Office '{office_nm}' not found. Please create it first in the Office page.")
-                    continue
-
-                serial = str(row['Serial Number (serial_number)']).strip()
-
-                # Check if serial already exists in db
-                existing = Inventory.query.filter_by(serial_number=serial).first()
-                if existing:
-                    skipped.append(f"Row {index + 2}: Serial '{serial}' already exists.")
-                    continue
-
-                # Validate condition
-                valid_conditions = ['functional', 'non-functional', 'under-maintenance', 'under-repair']
-                condition = str(row['Condition (inventory_condition)']).strip().lower()
-                if condition not in valid_conditions:
-                    errors.append(f"Row {index + 2}: Invalid condition '{condition}'. Must be one of {valid_conditions}.")
-                    continue
-
-                new_inv = Inventory(
-                    inventory_nm=str(row['Inventory Name (inventory_nm)']).strip(),
-                    inventory_desc=str(row['Description (inventory_desc)']).strip() if pd.notna(row['Description (inventory_desc)']) else None,
-                    inventory_condition=condition,
-                    serial_number=serial,
-                    is_available=condition == 'functional',
-                    itemkind_id=itemkind.itemkind_id,
-                    office_id = office.office_id,
-                    category_id=category.category_id
-                )
-                db.session.add(new_inv)
-                inserted += 1
-
-            except Exception as e:
-                errors.append(f"Row {index + 2}: {str(e)}")
-                db.session.rollback()
+            # ── Validate BEFORE entering the savepoint ──
+            office_nm = str(row['Office Name (office_nm)']).strip()
+            office = Office.query.filter_by(office_nm=office_nm).first()
+            if not office:
+                errors.append(f"Row {index + 2}: Office '{office_nm}' not found. Please create it first.")
                 continue
 
+            serial = str(row['Serial Number (serial_number)']).strip()
+            existing = Inventory.query.filter_by(serial_number=serial).first()
+            if existing:
+                skipped.append(f"Row {index + 2}: Serial '{serial}' already exists.")
+                continue
+
+            valid_conditions = ['functional', 'non-functional', 'under-maintenance', 'under-repair']
+            condition = str(row['Condition (inventory_condition)']).strip().lower()
+            if condition not in valid_conditions:
+                errors.append(f"Row {index + 2}: Invalid condition '{condition}'. Must be one of {valid_conditions}.")
+                continue
+
+            # ── Only enter savepoint if validation passed ──
+            try:
+                with db.session.begin_nested():
+                    # Handle category
+                    cat_name = str(row['Category (category_nm)']).strip()
+                    category = Category.query.filter_by(category_nm=cat_name).first()
+                    if not category:
+                        category = Category(category_nm=cat_name)
+                        db.session.add(category)
+                        db.session.flush()
+
+                    # Handle itemkind
+                    itemkind_nm = str(row['Itemkind (itemkind_nm)']).strip()
+                    itemkind = Itemkind.query.filter_by(itemkind_nm=itemkind_nm).first()
+                    if not itemkind:
+                        itemkind = Itemkind(itemkind_nm=itemkind_nm)
+                        db.session.add(itemkind)
+                        db.session.flush()
+
+                    new_inv = Inventory(
+                        inventory_nm=str(row['Inventory Name (inventory_nm)']).strip(),
+                        inventory_desc=str(row['Description (inventory_desc)']).strip() if pd.notna(row['Description (inventory_desc)']) else None,
+                        inventory_condition=condition,
+                        serial_number=serial,
+                        is_available=condition == 'functional',
+                        itemkind_id=itemkind.itemkind_id,
+                        office_id=office.office_id,
+                        category_id=category.category_id
+                    )
+                    db.session.add(new_inv)
+                    inserted += 1
+
+            except Exception as e:
+                # Only this row's savepoint is rolled back, others are safe
+                errors.append(f"Row {index + 2}: {str(e)}")
+                continue
+
+        # Commit everything that succeeded
         db.session.commit()
         cache.clear()
 
@@ -785,6 +812,13 @@ def reports():
             'borrowed': total - available
         })
 
+    recent_reports = (Reports.query
+                      .options(
+                          joinedload(Reports.inventory),
+                          joinedload(Reports.student),
+                          joinedload(Reports.borrow)
+                      )).order_by(Reports.report_date.desc()).all()
+
     return render_template(
         'reports.html',
         total_borrows=total_borrows,
@@ -793,7 +827,8 @@ def reports():
         daily_counts=daily_counts,
         date_from=date_from,
         date_to=date_to,
-        itemkind_summary=itemkind_summary
+        itemkind_summary=itemkind_summary,
+        recent_reports=recent_reports
     )
 
 
@@ -809,7 +844,9 @@ def export_csv():
     records = BorrowTracker.query.options(
         joinedload(BorrowTracker.student),
         joinedload(BorrowTracker.inventory)
-    ).all()
+        ).filter(
+            BorrowTracker.status != 'pending'
+        ).all()
 
     for r in records:
         borrow_writer.writerow([
@@ -1334,14 +1371,24 @@ def student_borrow_bulk():
         skipped = []
 
         for inv_id in inventory_ids:
-            inventory_item = Inventory.query.get(inv_id)
+            inventory_item = db.session.get(Inventory, inv_id)
+
             if not inventory_item:
+                skipped.append(f"ID {inv_id}")
+                continue
+
+            if inventory_item.inventory_condition != 'functional':
                 skipped.append(inventory_item.inventory_nm)
                 continue
 
-            #skip non-functional, under-maintenance, and under-repair items
-            if inventory_item.inventory_condition != 'functional':
-                skipped.append(inv_id)
+            existing = BorrowTracker.query.filter_by(
+                student_id=student['id'],
+                inventory_id=inventory_item.inventory_id,
+                status='pending'
+            ).first()
+
+            if existing:
+                skipped.append(f"{inventory_item.inventory_nm} (already requested)")
                 continue
 
             approver_id = None
@@ -1359,10 +1406,16 @@ def student_borrow_bulk():
                 borrow_date=borrow_date_obj,
                 return_date=return_date_obj
             )
+
             db.session.add(borrow_record)
             borrowed.append(inventory_item.inventory_nm)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            flash("Database error occurred.", "danger")
+            return redirect(url_for('student_dashboard'))
 
         if borrowed:
             flash(f'Borrow requests submitted for: {", ".join(borrowed)}.', 'success')

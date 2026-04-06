@@ -80,7 +80,7 @@
     </div>
     <!-- Return Modal -->
     <div id="returnModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-        <div style="background:#1a2e1a; padding:2rem; border-radius:12px; width:400px; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);">
+        <div style="background:#1a2e1a; padding:2rem; border-radius:12px; width:400px; max-height:90vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.1);">
             <h3 style="margin-bottom:1.5rem; color:white;">
                 <i class="fa-solid fa-rotate-left"></i> Mark as Returned
             </h3>
@@ -91,19 +91,50 @@
 
                 <div style="margin-bottom:1rem;">
                     <label style="color:white; font-size:14px; display:block; margin-bottom:8px;">Item Condition upon Return</label>
-                    <select name="returned_condition" required
+                    <select name="returned_condition" id="returnConditionSelect" required
+                        onchange="toggleReturnReportFields()"
                         style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white; outline:none;">
                         <option value="functional">Functional</option>
-                        <option value="non-functional">Non-Functional</option>
+                        <option value="non-functional">Non-Functional (Damaged)</option>
                         <option value="under-maintenance">Under Maintenance</option>
                         <option value="under-repair">Under Repair</option>
+                        <option value="lost">Lost</option>
                     </select>
                 </div>
 
                 <div style="margin-bottom:1.5rem;">
-                    <label style="color:white; font-size:14px; display:block; margin-bottom:8px;">Remarks <span style="opacity:0.5; font-size:12px;">(optional)</span></label>
+                    <label style="color:white; font-size:14px; display:block; margin-bottom:8px;">
+                        Remarks <span style="opacity:0.5; font-size:12px;">(optional)</span>
+                    </label>
                     <textarea name="return_remarks" rows="3" placeholder="Any notes about the returned item..."
                         style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white; resize:none; outline:none;"></textarea>
+                </div>
+
+                <!-- Report fields — shown only for non-functional or lost -->
+                <div id="returnReportFields" style="display:none;">
+                    <hr style="margin-bottom:1rem; border:none; border-top:1px solid rgba(255,255,255,0.1);">
+                    <p style="color:#f87171; font-size:0.85rem; margin-bottom:1rem;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        A damage/lost report will be automatically filed.
+                    </p>
+
+                    <div style="margin-bottom:1rem;">
+                        <label style="color:white; font-size:14px; display:block; margin-bottom:8px;">Report Type</label>
+                        <select name="report_type" id="returnReportType"
+                            style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white; outline:none;">
+                            <option value="damaged">Damaged</option>
+                            <option value="lost">Lost</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom:1.5rem;">
+                        <label style="color:white; font-size:14px; display:block; margin-bottom:8px;">
+                            Report Description <span style="opacity:0.5; font-size:12px;">(optional)</span>
+                        </label>
+                        <textarea name="report_description" rows="3"
+                            placeholder="Describe the damage or circumstances of loss..."
+                            style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:#243824; color:white; resize:none; outline:none;"></textarea>
+                    </div>
                 </div>
 
                 <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
@@ -325,5 +356,19 @@
     document.getElementById('returnModal').addEventListener('click', function(e) {
         if (e.target === this) closeReturnModal();
     });
+    function toggleReturnReportFields() {
+        const select = document.getElementById('returnConditionSelect');
+        const reportFields = document.getElementById('returnReportFields');
+        const reportType = document.getElementById('returnReportType');
+        const bad = ['non-functional', 'lost'];
+
+        if (bad.includes(select.value)) {
+            reportFields.style.display = 'block';
+            // Auto-match report type to condition
+            reportType.value = select.value === 'lost' ? 'lost' : 'damaged';
+        } else {
+            reportFields.style.display = 'none';
+        }
+    }
 </script>
 {% endblock %}

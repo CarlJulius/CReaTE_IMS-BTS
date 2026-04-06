@@ -11,7 +11,7 @@
 body {
     height: 100vh;
     display: flex; /* Puts sidebar and main content side-by-side */
-    background:url("../static/img/bg_cover.png") no-repeat center center/cover;
+    background:url("../static/img/bg_cover2.png") no-repeat center center/cover;
     background-attachment: fixed;
     color: white;
     overflow: hidden; /* Prevents the whole page from scrolling, only the main content will scroll */
@@ -643,59 +643,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .sidebar-overlay.active {
     display: block;
 }
-.cal-section { margin-top: 1rem; }
-.cal-section-title { 
-    display: flex; align-items: center; gap: 6px;
-    font-size: 12px; font-weight: 600; 
-    color: rgba(255,255,255,0.7); margin-bottom: 8px; 
-}
-.cal-legend { 
-    display: flex; gap: 12px; margin-bottom: 8px; 
-}
-.cal-legend-item { 
-    display: flex; align-items: center; gap: 4px; 
-    font-size: 11px; color: rgba(255,255,255,0.6); 
-}
-.cal-dot { 
-    width: 8px; height: 8px; border-radius: 50%; 
-}
-.cal-dot.pending { background: #f59e0b; }
-.cal-dot.approved { background: #22c55e; }
-.cal-nav { 
-    display: flex; align-items: center; 
-    justify-content: space-between; margin-bottom: 8px; 
-}
-.cal-nav-btn { 
-    background: none; border: none; color: white; 
-    font-size: 18px; cursor: pointer; padding: 0 8px; 
-}
-.cal-month-label { 
-    font-size: 13px; font-weight: 600; color: white; 
-}
-.cal-grid { 
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; 
-}
-.cal-day-header { 
-    font-size: 10px; font-weight: 700; text-align: center;
-    color: rgba(255,255,255,0.4); padding: 4px 0; 
-}
-.cal-cell { 
-    font-size: 11px; text-align: center; padding: 4px 2px;
-    border-radius: 4px; color: rgba(255,255,255,0.7);
-    position: relative; cursor: default;
-}
-.cal-cell.today { 
-    background: rgba(255,255,255,0.15); font-weight: 700; color: white; 
-}
-.cal-cell.cal-pending { background: rgba(245,158,11,0.25); color: #fcd34d; }
-.cal-cell.cal-approved { background: rgba(34,197,94,0.25); color: #86efac; }
-.cal-cell.empty { background: none; }
-.cal-indicator { 
-    display: block; width: 4px; height: 4px; border-radius: 50%;
-    margin: 1px auto 0; 
-}
-.cal-indicator.pending { background: #f59e0b; }
-.cal-indicator.approved { background: #22c55e; }
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
@@ -773,4 +720,143 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         width: 100%;
         margin-bottom: 0.5rem;
     }
+}
+
+/* =========================================
+   LIGHT MODE OVERRIDES
+   ========================================= */
+body.light-mode {
+    /* Make sure you save the light background image we generated and update this path! */
+    background: url("../static/img/bg_cover3.png") no-repeat center center/cover;
+    color: #333;
+}
+
+/* Sidebar Light Mode */
+body.light-mode .sidebar {
+    background: rgba(245, 245, 245, 0.85); 
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.light-mode .sidebar h2,
+body.light-mode .nav-links a,
+body.light-mode .logout a,
+body.light-mode #theme-toggle {
+    color: #333 !important;
+}
+
+body.light-mode .sidebar-header i {
+    color: rgba(0, 0, 0, 0.7);
+}
+
+body.light-mode .nav-links a:hover, 
+body.light-mode .nav-links a.active {
+    background: rgba(0, 0, 0, 0.05);
+    border-left: 3px solid #007BFF; /* Changing accent to blue for light mode */
+}
+
+/* Cards & Tables Light Mode */
+body.light-mode .stat-card,
+body.light-mode .table-container,
+body.light-mode .search-box input,
+body.light-mode .filter-dropdown {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #333;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+body.light-mode .stat-info p,
+body.light-mode .stat-card i,
+body.light-mode th,
+body.light-mode .search-box input::placeholder,
+body.light-mode td {
+    color: #555;
+}
+
+body.light-mode table td {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+body.light-mode thead th {
+    background: rgba(240, 240, 240, 0.95);
+}
+
+body.light-mode .dashboard-overlay {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* =========================================
+   LIGHT MODE OVERRIDES: BAR CHART
+   ========================================= */
+
+/* Update the chart card background and border */
+body.light-mode .chart-container {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+/* Change the chart title to dark gray */
+body.light-mode .chart-container h3 {
+    color: #333;
+}
+
+/* Change the x-axis line at the bottom to dark gray */
+body.light-mode .css-chart {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+/* Change the day labels (Mon, Tue, etc.) to dark gray */
+body.light-mode .bar-group span {
+    color: #555;
+    font-weight: bold;
+}
+
+/* Optional: Make the blue bars slightly more solid so they pop better on a light background */
+body.light-mode .bar {
+    background: linear-gradient(to top, rgba(0, 123, 255, 0.6), rgba(0, 123, 255, 1));
+    border: 1px solid rgba(0, 123, 255, 0.8);
+    border-bottom: none;
+}
+
+/* =========================================
+   LIGHT MODE OVERRIDES: EXPORT BUTTON
+   ========================================= */
+body.light-mode .action-btn.export-btn {
+    color: #333; /* Changes text and icon to dark gray/black */
+    background: rgba(0, 0, 0, 0.05); /* Gives it a subtle dark transparent background */
+    border: 1px solid rgba(0, 0, 0, 0.2); /* Darkens the border so it's visible */
+}
+
+body.light-mode .action-btn.export-btn:hover {
+    background: rgba(0, 0, 0, 0.1); /* Darkens slightly when hovered */
+}
+
+/* =========================================
+   LIGHT MODE OVERRIDES: DATE FILTERS
+   ========================================= */
+
+/* Force the "From:" and "To:" text to be dark, overriding the inline HTML style */
+body.light-mode .search-box span {
+    color: #333 !important;
+    font-weight: bold;
+}
+
+/* Ensure the text inside the date input is dark */
+body.light-mode .search-box input[type="date"] {
+    color: #333;
+}
+
+/* Revert the calendar icon back to black so it doesn't disappear */
+body.light-mode input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0); /* Removes the white filter, making it dark again */
+}
+
+/* =========================================
+   LIGHT MODE OVERRIDES: SEARCH BUTTON
+   ========================================= */
+body.light-mode .controls-container .action-btn[type="submit"] {
+    background: #333 !important; /* Dark gray/black background */
+    color: white !important; /* Keeps the text readable */
+    border-color: #222 !important;
 }
