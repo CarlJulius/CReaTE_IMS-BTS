@@ -970,13 +970,31 @@ def reject_request(borrow_id):
 def reports():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
+    month_filter = request.args.get('month', '')
 
     query = BorrowTracker.query
 
-    if date_from:
-        query = query.filter(BorrowTracker.request_date >= datetime.strptime(date_from, '%Y-%m-%d'))
-    if date_to:
-        query = query.filter(BorrowTracker.request_date <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
+    #month filter overrides date range if provided
+    if month_filter:
+        try:
+            month_date = datetime.strptime(month_filter, '%Y-%m')
+            first_day = month_date.replace(day=1)
+            if month_date.month == 12:
+                last_day = month_date.replace(day=1)
+            else:
+                last_day = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+            query = query.filter(
+                BorrowTracker.request_date >= first_day,
+                BorrowTracker.request_date <= last_day + timedelta(days=1)
+            )
+        except ValueError:
+            flash('Invalid month format. Please use YYYY-MM.', 'danger')
+            pass
+    elif date_from or date_to:
+        if date_from:
+            query = query.filter(BorrowTracker.request_date >= datetime.strptime(date_from, '%Y-%m-%d'))
+        if date_to:
+            query = query.filter(BorrowTracker.request_date <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1))
 
     total_borrows = query.count()
     damage_reports = Reports.query.count()
@@ -1028,6 +1046,7 @@ def reports():
         most_borrowed=most_borrowed.inventory_nm if most_borrowed else 'N/A',
         damage_reports=damage_reports,
         daily_counts=daily_counts,
+        month_filter=month_filter,
         date_from=date_from,
         date_to=date_to,
         itemkind_summary=itemkind_summary,
@@ -1039,17 +1058,46 @@ def reports():
 @app.route('/admin/reports/export')
 @admin_required
 def export_csv():
+    month_filter = request.args.get('month', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    # ── Build filtered borrow query ──-
+    base_query = BorrowTracker.query.options(
+        joinedload(BorrowTracker.student),
+        joinedload(BorrowTracker.inventory)
+    ).filter(BorrowTracker.status != 'pending')
+
+    if month_filter:
+        try:
+            month_date = datetime.strptime(month_filter, '%Y-%m')
+            first_day = month_date.replace(day=1)
+            if month_date.month == 12:
+                last_day = month_date.replace(day=31)
+            else:
+                last_day = month_date.replace(month=month_date.month + 1, day=1) - timedelta(days=1)
+            base_query = base_query.filter(
+                BorrowTracker.request_date >= first_day,
+                BorrowTracker.request_date <= last_day + timedelta(days=1)
+            )
+        except ValueError:
+            pass
+    elif date_from or date_to:
+        if date_from:
+            base_query = base_query.filter(
+                BorrowTracker.request_date >= datetime.strptime(date_from, '%Y-%m-%d')
+            )
+        if date_to:
+            base_query = base_query.filter(
+                BorrowTracker.request_date <= datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+            )
+
+    records = base_query.all()
+
     # ── Borrow Records CSV ──
     borrow_output = io.StringIO()
     borrow_writer = csv.writer(borrow_output)
     borrow_writer.writerow(['Borrow ID', 'Student Name', 'Student Number', 'Faculty In Charge', 'Contact Number', 'Item', 'Status', 'Request Date', 'Borrow Date', 'Return Date', 'Remarks'])
-
-    records = BorrowTracker.query.options(
-        joinedload(BorrowTracker.student),
-        joinedload(BorrowTracker.inventory)
-        ).filter(
-            BorrowTracker.status != 'pending'
-        ).all()
 
     for r in records:
         borrow_writer.writerow([
@@ -1099,6 +1147,14 @@ def export_csv():
             total - available
         ])
 
+    # ── Filename reflects filter ──
+    if month_filter:
+        filename = f'reports_{month_filter}.zip'
+    elif date_from or date_to:
+        filename = f'reports_{date_from}_to_{date_to}.zip'
+    else:
+        filename = 'reports.zip'
+
     # ── Zip all three ──
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
@@ -1110,7 +1166,7 @@ def export_csv():
     return Response(
         zip_buffer,
         mimetype='application/zip',
-        headers={'Content-Disposition': 'attachment; filename=reports.zip'}
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
     )
 
 @app.route('/admin/office', methods=['GET', 'POST'])

@@ -353,6 +353,24 @@ th {
     color: white;
 }
 
+/* Fix month picker visibility */
+input[type="month"] {
+    color-scheme: dark;
+    color: white;
+    width: auto;
+    min-width: 150px;
+}
+
+input[type="month"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
+/* Fix date-filters search-box overflow cutting off picker */
+.date-filters .search-box {
+    overflow: visible;
+}
+
 /* Buttons and Badges */
 .action-btn.add-btn {
     background: #05641f;
