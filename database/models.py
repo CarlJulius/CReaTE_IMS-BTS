@@ -72,6 +72,9 @@ class Student(db.Model):
     student_number = db.Column(db.String(20), unique=True, nullable=False)
     student_year = db.Column(db.String(20), nullable=False)
     student_course = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
 
 
 class Office(db.Model):
@@ -106,6 +109,10 @@ class Faculty(db.Model):
         nullable=False
         )
     office_id = db.Column(db.Integer, db.ForeignKey('office.office_id'), nullable=False, index=True)
+    failed_attempts = db.Column(db.Integer, default=0, nullable=False)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
 
     office = db.relationship('Office', back_populates='faculties')
     approver_role = db.relationship('EquipmentApprover', back_populates='faculty', uselist=False)

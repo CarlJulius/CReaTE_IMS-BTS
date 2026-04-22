@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from database.models import db, BorrowTracker, Student, Office, Faculty, Category, Inventory, EquipmentApprover, Reports, Itemkind
 from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload, contains_eager
-from forms import StudentForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm, StudentFollowUpForm
+from forms import StudentLoginForm, StudentRegisterForm, LoginForm, SignupForm, BorrowForm, InventoryForm, OfficeForm, CategoryForm, FacultyForm, StudentFollowUpForm
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone, timedelta, date
 from functools import wraps
@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_mail import Mail, Message
+import random
+import secrets
+import string
 import pandas as pd
 import re
 import os
@@ -43,6 +47,41 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = not app.debug
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
+
+mail = Mail(app)
+
+# OTP helper functions
+def generate_otp():
+    return ''.join(secrets.choice(string.digits) for _ in range(6))
+
+def send_verification_email(email, otp, name):
+    try:
+        msg = Message(
+            subject='Your Verification Code — HIRaM System',
+            recipients=[email]
+        )
+        msg.body = f"""Hello {name},
+
+Your verification code is: {otp}
+
+This code expires in 10 minutes.
+
+If you did not request this, please ignore this email.
+
+— HIRaM System team
+"""
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Mail error: {e}")
+        return False
 
 # Check session expiry on every student request
 @app.before_request
@@ -98,27 +137,142 @@ def master_admin_required(f):
 def index():
     return render_template('index.html')
 
+############# OTP verification routes #############
+@app.route('/verify-otp', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+def verify_otp():
+    # Must have a pending verification in session
+    if 'pending_verification' not in session:
+        flash('No verification pending.', 'warning')
+        return redirect(url_for('student_information'))
+
+    if request.method == 'POST':
+        entered_otp = request.form.get('otp', '').strip()
+        pending = session['pending_verification']
+
+        # Check expiry — 10 minutes
+        created_at = pending.get('created_at')
+        now = datetime.now(timezone.utc).timestamp()
+        if now - created_at > 600:
+            session.pop('pending_verification', None)
+            flash('OTP expired. Please register again.', 'danger')
+            return redirect(url_for('student_information'))
+
+        if entered_otp != pending['otp']:
+            flash('Incorrect OTP. Please try again.', 'danger')
+            return render_template('verify-otp.html')
+
+        # OTP correct — activate account
+        user_type = pending.get('user_type')
+
+        if user_type == 'student':
+            student = Student.query.get(pending['user_id'])
+            if student:
+                # mark verified and redirect to login/info page (do not auto-login)
+                student.is_verified = True
+                db.session.commit()
+                session.pop('pending_verification', None)
+                flash('Email verified! You may now log in.', 'success')
+                return redirect(url_for('student_information'))
+
+        elif user_type == 'faculty':
+            faculty = Faculty.query.get(pending['user_id'])
+            if faculty:
+                faculty.is_verified = True
+                db.session.commit()
+                session.pop('pending_verification', None)
+                flash('Email verified! You can now log in.', 'success')
+                return redirect(url_for('admin'))
+
+        flash('Something went wrong.', 'danger')
+        return redirect(url_for('student_information'))
+
+    return render_template('verify-otp.html')
+
+
+@app.route('/verify-otp/resend', methods=['POST'])
+@limiter.limit("5 per minute")
+def resend_otp():
+    if 'pending_verification' not in session:
+        flash('No verification pending.', 'warning')
+        return redirect(url_for('student_information'))
+
+    pending = session['pending_verification']
+    new_otp = generate_otp()
+    pending['otp'] = new_otp
+    pending['created_at'] = datetime.now(timezone.utc).timestamp()
+    session['pending_verification'] = pending
+
+    sent = send_verification_email(pending['email'], new_otp, pending['name'])
+    if sent:
+        flash('A new OTP has been sent to your email.', 'success')
+    else:
+        flash('Failed to send email. Please try again.', 'danger')
+
+    return redirect(url_for('verify_otp'))
+
 ######################Admin login#########################
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if 'faculty' in session:
         return redirect(url_for('admin_dashboard'))
+
     form = LoginForm()
     if form.validate_on_submit():
         faculty = Faculty.query.filter_by(username=form.username.data).first()
-        if faculty and check_password_hash(faculty.password, form.password.data):
-            if faculty.role not in ['master_admin', 'approver']:
-                flash('You do not have admin access. Please use the student portal.', 'danger')
-                return render_template('admin-login.html', form=form)
-            session['faculty'] = {
-                'id': faculty.faculty_id,
-                'name': faculty.faculty_nm,
-                'username': faculty.username,
-                'role': faculty.role
-            }
-            return redirect(url_for('admin_dashboard'))
+
+        if faculty:
+            # Check lockout
+            now = datetime.now(timezone.utc)
+            if faculty.locked_until:
+                locked_until = faculty.locked_until.replace(tzinfo=timezone.utc)
+                if now < locked_until:
+                    remaining = int((locked_until - now).total_seconds() / 60) + 1
+                    flash(f'Account locked. Try again in {remaining} minute(s).', 'danger')
+                    return render_template('admin-login.html', form=form)
+                else:
+                    faculty.failed_attempts = 0
+                    faculty.locked_until = None
+                    db.session.commit()
+
+            if check_password_hash(faculty.password, form.password.data):
+                if faculty.role not in ['master_admin', 'approver']:
+                    flash('You do not have admin access.', 'danger')
+                    return render_template('admin-login.html', form=form)
+
+                if not faculty.is_verified:
+                    flash('Please verify your email before logging in.', 'warning')
+                    return render_template('admin-login.html', form=form)
+
+                # Reset on successful login
+                faculty.failed_attempts = 0
+                faculty.locked_until = None
+                db.session.commit()
+
+                session['faculty'] = {
+                    'id': faculty.faculty_id,
+                    'name': faculty.faculty_nm,
+                    'username': faculty.username,
+                    'role': faculty.role
+                }
+                return redirect(url_for('admin_dashboard'))
+
+            else:
+                faculty.failed_attempts += 1
+                if faculty.failed_attempts >= MAX_FAILED_ATTEMPTS:
+                    faculty.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+                    db.session.commit()
+                    flash(f'Too many failed attempts. Account locked for {LOCKOUT_MINUTES} minutes.', 'danger')
+                else:
+                    remaining_attempts = MAX_FAILED_ATTEMPTS - faculty.failed_attempts
+                    db.session.commit()
+                    flash(f'Invalid password. {remaining_attempts} attempt(s) remaining.', 'danger')
         else:
-            flash('Invalid username or password', 'danger')
+            flash('Invalid username or password.', 'danger')
+
     return render_template('admin-login.html', form=form)
 
 @app.route('/admin/logout')
@@ -131,13 +285,15 @@ def admin_logout():
 def signup():
     form = SignupForm()
     if form.validate_on_submit():
-        if form.password.data != form.confirm_password.data:
-            flash('Passwords do not match', 'danger')
-            return render_template('admin-signup.html', form=form)
-
         existing_user = Faculty.query.filter_by(username=form.username.data).first()
         if existing_user:
             flash('Username already exists', 'danger')
+            return render_template('admin-signup.html', form=form)
+
+        email = form.email.data.strip().lower()
+        existing_email = Faculty.query.filter_by(email=email).first()
+        if existing_email:
+            flash('Email already registered.', 'danger')
             return render_template('admin-signup.html', form=form)
 
         office = Office.query.first()
@@ -146,22 +302,42 @@ def signup():
             db.session.add(office)
             db.session.commit()
 
-        #check existing acc role auto assign
         existing_account = Faculty.query.count()
         role = 'master_admin' if existing_account == 0 else 'faculty'
 
-        hashed_password = generate_password_hash(form.password.data)
         new_faculty = Faculty(
             username=form.username.data,
-            password=hashed_password,
+            password=generate_password_hash(form.password.data),
             faculty_nm=form.username.data,
             office_id=office.office_id,
-            role = role
+            role=role,
+            email=email,
+            is_verified=False
         )
         db.session.add(new_faculty)
         db.session.commit()
-        flash('Account created successfully! Please log in.', 'success')
-        return redirect(url_for('index'))
+
+        # Send OTP
+        otp = generate_otp()
+        sent = send_verification_email(email, otp, new_faculty.faculty_nm)
+
+        if not sent:
+            db.session.delete(new_faculty)
+            db.session.commit()
+            flash('Failed to send verification email.', 'danger')
+            return render_template('admin-signup.html', form=form)
+
+        session['pending_verification'] = {
+            'otp': otp,
+            'user_id': new_faculty.faculty_id,
+            'user_type': 'faculty',
+            'email': email,
+            'name': new_faculty.faculty_nm,
+            'created_at': datetime.now(timezone.utc).timestamp()
+        }
+
+        flash(f'A verification code has been sent to {email}.', 'info')
+        return redirect(url_for('verify_otp'))
 
     return render_template('admin-signup.html', form=form)
 
@@ -207,18 +383,45 @@ def edit_profile():
 #helper function to check for overdue items and update their status
 def check_overdue():
     today = date.today()
-    # Update status to 'overdue' for items past return date and still not returned
-    BorrowTracker.query.filter( BorrowTracker.status.in_(['approved', 'borrowed']),
-                               BorrowTracker.return_date < today).update({'status': 'overdue'}, 
-                               synchronize_session=False)
-    
-    # items not available when borrow date is today
-    due_today = BorrowTracker.query.filter( BorrowTracker.status.in_(['approved', 'borrowed']),
-                                            BorrowTracker.borrow_date <= today
-                                            ).all()
-    for record in due_today:
-        record.inventory.is_available = False
-    
+    # Find borrow records that are past their return date and still marked approved/borrowed
+    overdue_records = (
+        BorrowTracker.query
+        .options(joinedload(BorrowTracker.student), joinedload(BorrowTracker.inventory))
+        .filter(
+            BorrowTracker.status.in_(['approved', 'borrowed']),
+            BorrowTracker.return_date < today
+        )
+        .all()
+    )
+
+    for record in overdue_records:
+        # Transition status and mark inventory unavailable
+        record.status = 'overdue'
+        if record.inventory:
+            record.inventory.is_available = False
+
+        # Send a single overdue email notification when we transition to overdue
+        try:
+            student = record.student
+            inv = record.inventory
+            if student and student.email:
+                subject = f"Overdue Notice: {inv.inventory_nm if inv else 'Item'}"
+                msg = Message(subject=subject, recipients=[student.email])
+                msg.body = f"""Hello {student.student_nm or 'Student'},
+
+The item '{inv.inventory_nm if inv else 'N/A'}' you borrowed was due on {record.return_date.strftime('%Y-%m-%d')}.
+
+Please return it as soon as possible or contact the office to arrange a resolution.
+
+If you have already returned the item, please ignore this message.
+
+— CEGS Faculty
+"""
+                mail.send(msg)
+        except Exception as e:
+            # Log and continue without interrupting the process
+            print(f"Failed sending overdue email for borrow_id={getattr(record, 'borrow_id', 'N/A')}: {e}")
+
     db.session.commit()
 
 @app.route('/admin/dashboard', methods=['GET', 'POST'])
@@ -1134,43 +1337,104 @@ def category():
 
 #########################Student dashboard and borrowing routes#########################
 
-@app.route('/student/information', methods=['GET', 'POST'])
+def send_borrow_notification(borrowed_items, student, borrow_records):
+    try:
+        # Collect unique recipients from all item offices
+        recipients = set()
+
+        master_admins = Faculty.query.filter_by(role='master_admin').all()
+        for admin in master_admins:
+            if admin.email:
+                recipients.add(admin.email)
+
+        for inventory_item in borrowed_items:
+            approver_config = inventory_item.office.approver_config if inventory_item.office else None
+            if approver_config:
+                approver = Faculty.query.get(approver_config.faculty_id)
+                if approver and approver.email:
+                    recipients.add(approver.email)
+
+        if not recipients:
+            return
+
+        # Build item list for email body
+        item_lines = []
+        for record, item in zip(borrow_records, borrowed_items):
+            item_lines.append(
+                f"  - {item.inventory_nm} (Serial: {item.serial_number}, "
+                f"Office: {item.office.office_nm if item.office else 'N/A'})"
+            )
+
+        first_record = borrow_records[0] if borrow_records else None
+
+        msg = Message(
+            subject=f'New Borrow Request — HIRaM System',
+            recipients=list(recipients)
+        )
+        msg.body = f"""A new borrow request has been submitted.
+
+Student: {student['name']}
+ID Number: {student['number']}
+Borrow Date: {first_record.borrow_date if first_record else 'N/A'}
+Return Date: {first_record.return_date if first_record else 'N/A'}
+Faculty In Charge: {first_record.faculty_incharge or 'N/A' if first_record else 'N/A'}
+Remarks: {first_record.remarks or 'None' if first_record else 'None'}
+
+Items Requested ({len(borrowed_items)}):
+{chr(10).join(item_lines)}
+
+Please log in to the admin panel to approve or reject these requests.
+"""
+        mail.send(msg)
+    except Exception as e:
+        print(f"Bulk notification email error: {e}")
+
+
+@app.route('/student/login', methods=['GET', 'POST'])
 @limiter.limit("20 per minute")
 def student_information():
     if 'student' in session:
         return redirect(url_for('student_dashboard'))
 
-    form = StudentForm()
-
+    login_form = StudentLoginForm()
+    
     if request.method == 'POST':
         user_type = request.form.get('user_type', 'student')
 
+        # ── Faculty login ──
         if user_type == 'faculty':
             id_number = request.form.get('id_number', '').strip()
             faculty_password = request.form.get('faculty_password', '').strip()
 
             if not id_number or not faculty_password:
                 flash('Please enter your username and password.', 'danger')
-                return render_template('student-information.html', form=form)
+                return render_template('student-information.html', login_form=login_form)
 
             faculty = Faculty.query.filter_by(username=id_number).first()
-
             if not faculty:
                 flash('Faculty username not found.', 'danger')
-                return render_template('student-information.html', form=form)
+                return render_template('student-information.html', login_form=login_form)
 
             if not check_password_hash(faculty.password, faculty_password):
                 flash('Incorrect password.', 'danger')
-                return render_template('student-information.html', form=form)
+                return render_template('student-information.html', login_form=login_form)
 
             student_number = f"FAC-{faculty.faculty_id}"
             student = Student.query.filter_by(student_number=student_number).first()
             if not student:
+                # Create a corresponding student record for faculty users.
+                # The Student model requires non-null `email` and `password` fields
+                # in the current schema, so provide empty placeholders to satisfy
+                # the NOT NULL constraint. Faculty authenticate via the
+                # `Faculty` table, not this student record.
                 student = Student(
                     student_nm=faculty.faculty_nm,
                     student_number=student_number,
                     student_course='Faculty',
-                    student_year='N/A'
+                    student_year='N/A',
+                    email=f"faculty_{faculty.faculty_id}@internal.local",
+                    password='',
+                    is_verified=True
                 )
                 db.session.add(student)
                 db.session.commit()
@@ -1183,38 +1447,134 @@ def student_information():
                 'year': 'N/A',
                 'is_faculty': True
             }
-
             flash('Welcome, ' + faculty.faculty_nm + '!', 'success')
             return redirect(url_for('student_dashboard'))
 
-        else:
-            if form.validate_on_submit():
-                student_number = form.id_number.data.strip()
-                student = Student.query.filter_by(student_number=student_number).first()
+        # ── Student login ──
+        # If the student POST does not validate, show errors to help debugging
+        if user_type == 'student' and request.method == 'POST' and not login_form.validate_on_submit():
+            print('Student login form errors:', login_form.errors)
+            flash('Login failed: please check the form fields.', 'danger')
+            for field, msgs in login_form.errors.items():
+                for m in msgs:
+                    flash(f"{field}: {m}", 'danger')
 
-                if not student:
-                    student = Student(
-                        student_nm=form.name.data.strip(),
-                        student_number=student_number,
-                        student_course=form.course.data.strip(),
-                        student_year=form.year.data.strip()
-                    )
-                    db.session.add(student)
-                    db.session.commit()
+        if login_form.validate_on_submit():
+            student_number = login_form.id_number.data.strip()
+            password = login_form.password.data.strip()
 
-                session['student'] = {
-                    'id': student.student_id,
-                    'name': student.student_nm,
-                    'number': student.student_number,
-                    'course': student.student_course,
-                    'year': student.student_year,
-                    'is_faculty': False
-                }
+            student = Student.query.filter_by(student_number=student_number).first()
 
-                flash('Welcome, ' + student.student_nm + '!', 'success')
-                return redirect(url_for('student_dashboard'))
+            if not student:
+                flash('No account found. Please sign up first.', 'danger')
+                return render_template('student-information.html', login_form=login_form)
 
-    return render_template('student-information.html', form=form)
+            if not student.is_verified:
+                flash('Please verify your email first.', 'warning')
+                return render_template('student-information.html', login_form=login_form)
+
+            if not student.password or not check_password_hash(student.password, password):
+                flash('Incorrect password.', 'danger')
+                return render_template('student-information.html', login_form=login_form)
+
+            # Update course and year on every login. Update name only if provided.
+            name_field = getattr(login_form, 'name', None)
+            if name_field and name_field.data and name_field.data.strip():
+                student.student_nm = name_field.data.strip()
+            student.student_course = login_form.course.data.strip()
+            student.student_year = login_form.year.data.strip()
+            db.session.commit()
+
+            session['student'] = {
+                'id': student.student_id,
+                'name': student.student_nm,
+                'number': student.student_number,
+                'course': student.student_course,
+                'year': student.student_year,
+                'is_faculty': False
+            }
+            flash('Welcome back, ' + student.student_nm + '!', 'success')
+            return redirect(url_for('student_dashboard'))
+
+    return render_template('student-information.html', login_form=login_form)
+
+
+@app.route('/student/register', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
+def student_register():
+    if 'student' in session:
+        return redirect(url_for('student_dashboard'))
+
+    register_form = StudentRegisterForm()
+
+    if register_form.validate_on_submit():
+        student_number = register_form.id_number.data.strip()
+        email = register_form.email.data.strip().lower()
+        password = register_form.password.data.strip()
+        name = register_form.name.data.strip()
+        course = register_form.course.data.strip()
+        year = register_form.year.data.strip()
+
+        # Check if student number already registered
+        existing_student = Student.query.filter_by(student_number=student_number).first()
+        if existing_student:
+            flash('This ID number is already registered. Please log in instead.', 'danger')
+            return render_template('student-register.html', register_form=register_form)
+
+        # If POST but validation failed, show errors to help debug client-side issues
+        if request.method == 'POST' and not register_form.validate_on_submit():
+            errors = register_form.errors
+            # Log to console and show flash so developer/user sees why submission failed
+            print('Student register form errors:', errors)
+            flash('Registration failed: please check the form fields.', 'danger')
+            for field, msgs in errors.items():
+                for m in msgs:
+                    flash(f"{field}: {m}", 'danger')
+
+        # Check if email already taken
+        existing_email = Student.query.filter_by(email=email).first()
+        if existing_email:
+            flash('This email is already registered.', 'danger')
+            return render_template('student-register.html', register_form=register_form)
+
+        # Create unverified student
+        student = Student(
+            student_nm=name,
+            student_number=student_number,
+            student_course=course,
+            student_year=year,
+            email=email,
+            password=generate_password_hash(password),
+            is_verified=False
+        )
+        db.session.add(student)
+        db.session.commit()
+
+        # Send OTP
+        otp = generate_otp()
+        sent = send_verification_email(email, otp, name)
+
+        if not sent:
+            # Clean up if email fails
+            db.session.delete(student)
+            db.session.commit()
+            flash('Failed to send verification email. Please check your email address.', 'danger')
+            return render_template('student-register.html', register_form=register_form)
+
+        # Store OTP in session
+        session['pending_verification'] = {
+            'otp': otp,
+            'user_id': student.student_id,
+            'user_type': 'student',
+            'email': email,
+            'name': name,
+            'created_at': datetime.now(timezone.utc).timestamp()
+        }
+
+        flash(f'A verification code has been sent to {email}.', 'info')
+        return redirect(url_for('verify_otp'))
+
+    return render_template('student-register.html', register_form=register_form)
 
 @app.route('/student/myrequests', methods=['GET', 'POST'])
 def student_requests():
@@ -1343,6 +1703,8 @@ def student_borrow():
         db.session.add(borrow_record)
         db.session.commit()
 
+        send_borrow_notification([inventory_item], student, [borrow_record])
+
         return redirect(url_for('student_dashboard'))
 
     return render_template('student-borrow.html', form=form, inventory=inventory_item, student=student)
@@ -1369,6 +1731,8 @@ def student_borrow_bulk():
 
         borrowed = []
         skipped = []
+        borrowed_inventory_items = []  # track inventory objects
+        borrow_records_list = []       # track borrow records
 
         for inv_id in inventory_ids:
             inventory_item = db.session.get(Inventory, inv_id)
@@ -1409,6 +1773,8 @@ def student_borrow_bulk():
 
             db.session.add(borrow_record)
             borrowed.append(inventory_item.inventory_nm)
+            borrowed_inventory_items.append(inventory_item)  # collect item
+            borrow_records_list.append(borrow_record)        # collect record
 
         try:
             db.session.commit()
@@ -1417,10 +1783,14 @@ def student_borrow_bulk():
             flash("Database error occurred.", "danger")
             return redirect(url_for('student_dashboard'))
 
+        # Send one email for all borrowed items after commit
+        if borrowed_inventory_items:
+            send_borrow_notification(borrowed_inventory_items, student, borrow_records_list)
+
         if borrowed:
             flash(f'Borrow requests submitted for: {", ".join(borrowed)}.', 'success')
         if skipped:
-            flash(f'{len(skipped)} item(s) were skipped. {", ".join(skipped)}', 'warning')
+            flash(f'{len(skipped)} item(s) were skipped: {", ".join(skipped)}', 'warning')
 
         return redirect(url_for('student_dashboard'))
 
@@ -1434,7 +1804,9 @@ def student_borrow_bulk():
         flash('No items found.', 'warning')
         return redirect(url_for('student_cart'))
 
-    return render_template('student-borrow-bulk.html', inventories=inventories, student=student, form=form)
+    return render_template('student-borrow-bulk.html', 
+                           inventories=inventories, 
+                           student=student, form=form)
 
 @app.route('/student/cart', methods=['GET', 'POST'])
 def student_cart():

@@ -644,6 +644,163 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     display: block;
 }
 
+/* ── BORROWING CALENDAR ── */
+.cal-section {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 1rem;
+}
+
+.cal-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+}
+
+/* Legend */
+.cal-legend {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.cal-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.cal-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.cal-dot.pending  { background: #f59e0b; }
+.cal-dot.approved { background: #22c55e; }
+
+/* Navigation */
+.cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.cal-nav-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: white;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.cal-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.cal-month-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+}
+
+/* Grid */
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.cal-day-header {
+    text-align: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.35);
+    padding: 4px 0;
+    text-transform: uppercase;
+}
+
+.cal-cell {
+    position: relative;
+    text-align: center;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 5px 2px;
+    border-radius: 5px;
+    cursor: default;
+    transition: background 0.1s;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-cell.empty {
+    background: transparent;
+}
+
+.cal-cell.today {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Booked states */
+.cal-cell.cal-pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.cal-cell.cal-approved {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ade80;
+}
+
+/* Today + booked combination */
+.cal-cell.today.cal-pending {
+    background: rgba(245, 158, 11, 0.25);
+    border-color: #f59e0b;
+}
+
+.cal-cell.today.cal-approved {
+    background: rgba(34, 197, 94, 0.25);
+    border-color: #22c55e;
+}
+
+/* Dot indicator inside cell */
+.cal-indicator {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+}
+
+.cal-indicator.pending  { background: #f59e0b; }
+.cal-indicator.approved { background: #22c55e; }
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
 
